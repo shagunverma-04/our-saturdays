@@ -1,26 +1,219 @@
 @import "tailwindcss";
 
+/*
+ * Theme tokens. Light is the default. Dark applies when the system prefers it (unless the user chose
+ * "light" in us → look) or when they chose "dark". <html data-theme> is set by a tiny script before paint.
+ * The two dark blocks below are identical on purpose — CSS can't share one between a media query and a selector.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --paper: #f5f4f0;
+  --card: #ffffff;
+  --ink: #1c1c1a;
+  --on-ink: #ffffff; /* text that sits on an --ink surface */
+  --mute: #8b8a85;
+  --line: rgba(28, 28, 26, 0.07);
+  --sun: #ffd24a;
+  --glass: rgba(255, 255, 255, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --sh-soft: 0 1px 2px rgba(28, 28, 26, 0.04), 0 8px 24px -8px rgba(28, 28, 26, 0.1);
+  --sh-float: 0 2px 4px rgba(28, 28, 26, 0.05), 0 16px 40px -12px rgba(28, 28, 26, 0.22);
+  --dot: rgba(28, 28, 26, 0.08);
+  --skel-a: #ebeae5;
+  --skel-b: #f3f2ee;
+  --tile-hi: rgba(255, 255, 255, 0.8);
+  --tile-edge: rgba(255, 255, 255, 0.85);
+  /* map backdrop */
+  --map-land: #efeee8;
+  --map-park: #dde9d5;
+  --map-water: #d5e6f2;
+  --map-road: #ffffff;
+  --map-dash: #e3e2db;
+  /* category tints (t) and deeper tones (d) */
+  --t-all: #ecebe4;  --d-all: #c9c8be;
+  --t-places: #ffe4d6; --d-places: #f3b99b;
+  --t-eat: #fff0c4; --d-eat: #f0d27a;
+  --t-watch: #e6deff; --d-watch: #c3b4f2;
+  --t-do: #d9f1e0; --d-do: #a6d9b5;
+  --t-shop: #ffe0ea; --d-shop: #f4b5c9;
+  --t-travel: #d8ecfa; --d-travel: #a5cdeb;
+  --t-ideas: #eeeed2; --d-ideas: #d3d39a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #121211;
+  --card: #1e1e1c;
+  --ink: #f3f2ed;
+  --on-ink: #151514;
+  --mute: #96958f;
+  --line: rgba(255, 255, 255, 0.09);
+  --glass: rgba(36, 36, 34, 0.72);
+  --glass-edge: rgba(255, 255, 255, 0.1);
+  --sh-soft: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --sh-float: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px -12px rgba(0, 0, 0, 0.75);
+  --dot: rgba(255, 255, 255, 0.07);
+  --skel-a: #232321;
+  --skel-b: #2d2d2a;
+  --tile-hi: rgba(255, 255, 255, 0.14);
+  --tile-edge: rgba(255, 255, 255, 0.12);
+  --map-land: #1b1b19;
+  --map-park: #22301f;
+  --map-water: #1c2a38;
+  --map-road: #2c2c29;
+  --map-dash: #3a3a36;
+  --t-all: #2b2b28;  --d-all: #55554f;
+  --t-places: #4a3226; --d-places: #8a5a44;
+  --t-eat: #4a4021; --d-eat: #8c7a2c;
+  --t-watch: #3a3358; --d-watch: #6a5ca6;
+  --t-do: #26443a; --d-do: #3f7f66;
+  --t-shop: #4c2b39; --d-shop: #93526b;
+  --t-travel: #25394d; --d-travel: #40709c;
+  --t-ideas: #414126; --d-ideas: #7d7d3c;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #121211;
+    --card: #1e1e1c;
+    --ink: #f3f2ed;
+    --on-ink: #151514;
+    --mute: #96958f;
+    --line: rgba(255, 255, 255, 0.09);
+    --glass: rgba(36, 36, 34, 0.72);
+    --glass-edge: rgba(255, 255, 255, 0.1);
+    --sh-soft: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+    --sh-float: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px -12px rgba(0, 0, 0, 0.75);
+    --dot: rgba(255, 255, 255, 0.07);
+    --skel-a: #232321;
+    --skel-b: #2d2d2a;
+    --tile-hi: rgba(255, 255, 255, 0.14);
+    --tile-edge: rgba(255, 255, 255, 0.12);
+    --map-land: #1b1b19;
+    --map-park: #22301f;
+    --map-water: #1c2a38;
+    --map-road: #2c2c29;
+    --map-dash: #3a3a36;
+    --t-all: #2b2b28;  --d-all: #55554f;
+    --t-places: #4a3226; --d-places: #8a5a44;
+    --t-eat: #4a4021; --d-eat: #8c7a2c;
+    --t-watch: #3a3358; --d-watch: #6a5ca6;
+    --t-do: #26443a; --d-do: #3f7f66;
+    --t-shop: #4c2b39; --d-shop: #93526b;
+    --t-travel: #25394d; --d-travel: #40709c;
+    --t-ideas: #414126; --d-ideas: #7d7d3c;
   }
 }
 
+/* A surface that must stay light in dark mode (e.g. the yellow "pick for us" card): re-pins the light tokens. */
+.theme-light {
+  color-scheme: light;
+  --card: #ffffff;
+  --ink: #1c1c1a;
+  --on-ink: #ffffff;
+  --mute: #8b8a85;
+  --line: rgba(28, 28, 26, 0.07);
+  --glass: rgba(255, 255, 255, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --sh-soft: 0 1px 2px rgba(28, 28, 26, 0.04), 0 8px 24px -8px rgba(28, 28, 26, 0.1);
+  color: var(--ink);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-mute: var(--mute);
+  --color-line: var(--line);
+  --color-sun: var(--sun);
+  --font-sans: var(--f-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--f-display), var(--f-body), ui-sans-serif, sans-serif;
+  --shadow-soft: var(--sh-soft);
+  --shadow-float: var(--sh-float);
+  --radius-card: 28px;
+}
+
+html {
+  background: var(--paper);
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body), ui-sans-serif, system-ui, sans-serif;
+  overscroll-behavior-y: none;
+  min-height: 100dvh;
+}
+
+/* hide scrollbars on carousels, keep scrolling */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid var(--glass-edge);
+}
+
+/* soft dotted paper texture used behind placeholder art */
+.dots {
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.2px);
+  background-size: 14px 14px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px; /* stops iOS zoom-on-focus */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+.floaty {
+  animation: floaty 3.6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--skel-a) 25%, var(--skel-b) 50%, var(--skel-a) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
 }

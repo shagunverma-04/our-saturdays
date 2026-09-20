@@ -1,0 +1,23 @@
+{
+  "0": "CategoryIcon.tsx",
+  "1": "utils.ts",
+  "2": "compilerOptions",
+  "3": "remote.ts",
+  "4": "session.ts",
+  "5": "store.ts",
+  "6": "devDependencies",
+  "7": "AddSheet.tsx",
+  "8": "remote.test.ts",
+  "9": "bits.tsx",
+  "10": "route.tsx",
+  "11": "our saturdays",
+  "12": "AGENTS.md",
+  "13": "manifest.ts",
+  "14": "eslint.config.mjs",
+  "15": "next.config.ts",
+  "16": "postcss.config.mjs",
+  "17": "CLAUDE.md",
+  "18": "run-remote.sh",
+  "19": "run.sh",
+  "20": "AppUI.tsx"
+}
