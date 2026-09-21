@@ -63,3 +63,13 @@ export function homeMemory(memories: Memory[], now = new Date()): { memory: Memo
   for (const ch of today) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return { memory: older[h % older.length], fresh: false };
 }
+
+/** Newest first (by the day it happened; ties → most recently added). The order photos are swiped in. */
+export function sortMemories(memories: Memory[]): Memory[] {
+  return [...memories].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
+}
+
+/** A name for a memory nobody named: "sunday, sep 21". */
+export function autoTitle(iso: string): string {
+  return longDate(iso).replace(/, \d{4}$/, "");
+}

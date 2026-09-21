@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AddSheet } from "@/components/add/AddSheet";
 import { MemorySheet } from "@/components/memories/MemorySheet";
@@ -25,11 +26,14 @@ interface AddOptions {
 interface MemoryOptions {
   edit?: Memory;
   fromItem?: SavedItem;
+  files?: File[];
 }
 
 interface AppUIContextValue {
   openAdd: (opts?: AddOptions) => void;
   openMemory: (opts?: MemoryOptions) => void;
+  /** opens the phone's photo picker right away; the memory sheet follows with the photos already loading */
+  pickMemoryPhotos: () => void;
   toast: (message: string, emoji?: string) => void;
   /** screens can hint which category a fresh "+" should start on */
   setDefaultCategory: (c: CategoryId | undefined) => void;
@@ -46,6 +50,8 @@ export function useAppUI(): AppUIContextValue {
 /** Owns the add/edit sheet and the little "saved" toast so any screen can trigger them. */
 export function AppUIProvider({ children }: { children: ReactNode }) {
   const [add, setAdd] = useState<{ open: boolean; opts: AddOptions }>({ open: false, opts: {} });
+  const router = useRouter();
+  const photoInput = useRef<HTMLInputElement>(null);
   const [memory, setMemory] = useState<{ open: boolean; opts: MemoryOptions }>({ open: false, opts: {} });
   const [toastState, setToast] = useState<{ id: number; message: string; emoji: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -57,6 +63,7 @@ export function AppUIProvider({ children }: { children: ReactNode }) {
   const openAdd = useCallback((opts: AddOptions = {}) => setAdd({ open: true, opts: { category: defaultCategory.current, ...opts } }), []);
   const closeAdd = useCallback(() => setAdd((a) => ({ ...a, open: false })), []);
   const openMemory = useCallback((opts: MemoryOptions = {}) => setMemory({ open: true, opts }), []);
+  const pickMemoryPhotos = useCallback(() => photoInput.current?.click(), []);
   const closeMemory = useCallback(() => setMemory((m) => ({ ...m, open: false })), []);
   const toast = useCallback((message: string, emoji = "✨") => {
     clearTimeout(timer.current);
@@ -75,12 +82,26 @@ export function AppUIProvider({ children }: { children: ReactNode }) {
   }, [noticeId, hasRetry]);
   const online = useSyncExternalStore(onlineSub, () => navigator.onLine, () => true);
 
-  const value = useMemo(() => ({ openAdd, openMemory, toast, setDefaultCategory }), [openAdd, openMemory, toast, setDefaultCategory]);
+  const value = useMemo(() => ({ openAdd, openMemory, pickMemoryPhotos, toast, setDefaultCategory }), [openAdd, openMemory, pickMemoryPhotos, toast, setDefaultCategory]);
 
   return (
     <AppUIContext.Provider value={value}>
       {children}
-      <MemorySheet open={memory.open} onClose={closeMemory} edit={memory.opts.edit} fromItem={memory.opts.fromItem} />
+      <input
+        ref={photoInput}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        aria-hidden
+        tabIndex={-1}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (files.length) setMemory({ open: true, opts: { files } });
+        }}
+      />
+      <MemorySheet open={memory.open} onClose={closeMemory} edit={memory.opts.edit} fromItem={memory.opts.fromItem} files={memory.opts.files} onSaved={(id) => router.push(`/memories/${id}`)} />
       <AddSheet open={add.open} onClose={closeAdd} category={add.opts.category} edit={add.opts.edit} />
       {!online && (
         <div role="status" className="fixed inset-x-0 top-0 z-[70] bg-ink px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-center text-[13px] font-medium text-on-ink">

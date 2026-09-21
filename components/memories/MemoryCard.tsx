@@ -13,18 +13,18 @@ const RATIOS = ["4 / 5", "1 / 1", "3 / 4", "5 / 4"];
 const OBJECTS = ["☕", "🎞️", "🌇", "🍃", "🌸", "🎈", "🍰", "🎧"]; // all long-supported, so none renders blank on an older phone
 
 /** A memory's cover: its first photo, or (when it has none yet) a little pastel illustration. */
-export function MemoryCover({ memory, className, ratio }: { memory: Memory; className?: string; ratio?: string }) {
+export function MemoryCover({ memory, className, ratio, fill, emojiClass = "text-5xl" }: { memory: Memory; className?: string; ratio?: string; fill?: boolean; emojiClass?: string }) {
   const src = useMediaUrl(memory.photos[0] ?? "");
   const [failed, setFailed] = useState("");
   const h = hash(memory.id);
   const tint = CATEGORIES[h % CATEGORIES.length];
   return (
-    <div className={`relative overflow-hidden ${className ?? ""}`} style={{ aspectRatio: ratio ?? RATIOS[h % RATIOS.length] }}>
+    <div className={`relative overflow-hidden ${className ?? ""}`} style={fill ? undefined : { aspectRatio: ratio ?? RATIOS[h % RATIOS.length] }}>
       {src && failed !== src ? (
         <img src={src} alt={memory.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(src)} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div className="dots absolute inset-0 flex items-center justify-center" style={{ backgroundColor: tint.tint }} role="img" aria-label={memory.title}>
-          <span aria-hidden className="text-5xl drop-shadow-[0_6px_6px_rgba(0,0,0,0.14)]" style={{ transform: `rotate(${((h >>> 3) % 13) - 6}deg)` }}>
+          <span aria-hidden className={`${emojiClass} drop-shadow-[0_6px_6px_rgba(0,0,0,0.14)]`} style={{ transform: `rotate(${((h >>> 3) % 13) - 6}deg)` }}>
             {OBJECTS[(h >>> 5) % OBJECTS.length]}
           </span>
         </div>

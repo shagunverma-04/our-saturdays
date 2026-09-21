@@ -52,7 +52,9 @@ const NAV = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { openAdd } = useAppUI();
+  const { openAdd, pickMemoryPhotos } = useAppUI();
+  // on the memories screens, + means "add photos" straight away, not the save-a-find sheet
+  const onMemories = pathname === "/memories" || pathname.startsWith("/memories/");
 
   // detail pages keep "later" lit
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
@@ -63,8 +65,8 @@ export function BottomNav() {
         <div className="pointer-events-none flex w-full max-w-[460px] justify-end pr-1">
           <motion.button
             type="button"
-            aria-label="add something"
-            onClick={() => openAdd()}
+            aria-label={onMemories ? "add photos" : "add something"}
+            onClick={() => (onMemories ? pickMemoryPhotos() : openAdd())}
             whileTap={{ scale: 0.88, rotate: 90 }}
             whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 420, damping: 16 }}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { activityFeed } from "../lib/activity.ts";
-import { groupByMonth, homeMemory, howLongAgo, longDate } from "../lib/memories.ts";
+import { autoTitle, groupByMonth, homeMemory, howLongAgo, longDate, sortMemories } from "../lib/memories.ts";
 import type { Memory, Profile } from "../lib/types.ts";
 
 const NOW = new Date("2026-09-24T10:00:00");
@@ -76,4 +76,15 @@ test("icons follow the object, not just the category (coffee spot → cup, not s
   assert.equal(iconFor({ category: "eat", tags: ["cafe", "brunch"] }), "places");
   assert.equal(iconFor({ category: "eat", tags: ["ramen"] }), "eat");
   assert.equal(iconFor({ category: "do", tags: [] }), "do");
+});
+
+test("swipe order is newest day first, then most recently added", () => {
+  const a = mem({ date: "2026-09-17", created_at: ago(9) }), b = mem({ date: "2026-09-20", created_at: ago(20) }), c = mem({ date: "2026-09-17", created_at: ago(2) });
+  assert.deepEqual(sortMemories([a, b, c]).map((m) => m.id), [b.id, c.id, a.id]);
+  const input = [a, b]; sortMemories(input); assert.deepEqual(input.map((m) => m.id), [a.id, b.id], "does not mutate its input");
+});
+
+test("unnamed memories get a human title from their date", () => {
+  assert.equal(autoTitle("2026-09-21"), "monday, sep 21");
+  assert.equal(autoTitle("2026-01-01"), "thursday, jan 1");
 });

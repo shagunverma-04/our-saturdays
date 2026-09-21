@@ -1,27 +1,28 @@
-# Graph Report - saturdays-together  (2026-09-20)
+# Graph Report - saturdays-together  (2026-09-21)
 
 ## Corpus Check
-- 60 files · ~23,608 words
+- 78 files · ~33,557 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 372 nodes · 942 edges · 20 communities (12 shown, 6 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.85)
+- 468 nodes · 1287 edges · 21 communities (13 shown, 6 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 23 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a089e258`
+- Built from commit: `011bc999`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
+- types.ts
 - utils.ts
 - compilerOptions
 - remote.ts
-- bits.tsx
+- session.ts
 - store.ts
 - devDependencies
-- media.ts
+- route.ts
 - remote.test.ts
 - AddSheet.tsx
 - route.tsx
@@ -32,72 +33,76 @@
 - postcss.config.mjs
 - run-remote.sh
 - run.sh
-- useAppUI
+- bits.tsx
 
 ## God Nodes (most connected - your core abstractions)
-1. `useStore()` - 26 edges
-2. `SavedItem` - 21 edges
-3. `useAppUI()` - 19 edges
-4. `getSupabase()` - 19 edges
-5. `CategoryId` - 18 edges
-6. `PillButton()` - 17 edges
-7. `compilerOptions` - 16 edges
-8. `cn()` - 15 edges
-9. `commit()` - 14 edges
-10. `AddForm()` - 13 edges
+1. `SavedItem` - 32 edges
+2. `useShared()` - 28 edges
+3. `useAppUI()` - 23 edges
+4. `getSupabase()` - 22 edges
+5. `cn()` - 19 edges
+6. `PillButton()` - 18 edges
+7. `commit()` - 17 edges
+8. `getSnapshot()` - 17 edges
+9. `CategoryId` - 17 edges
+10. `compilerOptions` - 17 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `NotesBox()` --calls--> `updateItem()`  [EXTRACTED]
-  app/later/[id]/page.tsx → lib/store.ts
-- `ItemDetailPage()` --calls--> `useItemActions()`  [EXTRACTED]
-  app/later/[id]/page.tsx → components/later/useItemActions.ts
-- `LaterPage()` --calls--> `useAppUI()`  [EXTRACTED]
-  app/later/page.tsx → components/ui/AppUI.tsx
-- `LaterPage()` --calls--> `setStatus()`  [EXTRACTED]
-  app/later/page.tsx → lib/store.ts
-- `LaterPage()` --calls--> `useStore()`  [EXTRACTED]
-  app/later/page.tsx → lib/store.ts
+- `TripsPage()` --calls--> `useAppUI()`  [EXTRACTED]
+  app/trips/page.tsx → components/ui/AppUI.tsx
+- `AppUIProvider()` --indirect_call--> `dismissNotice()`  [INFERRED]
+  components/ui/AppUI.tsx → lib/store.ts
+- `ItemDetailPage()` --calls--> `countdown()`  [EXTRACTED]
+  app/later/[id]/page.tsx → lib/utils.ts
+- `ItemDetailPage()` --calls--> `friendlyDay()`  [EXTRACTED]
+  app/later/[id]/page.tsx → lib/utils.ts
+- `ItemDetailPage()` --calls--> `sourceInfo`  [EXTRACTED]
+  app/later/[id]/page.tsx → lib/utils.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (20 total, 6 thin omitted)
+## Communities (21 total, 6 thin omitted)
+
+### Community 0 - "types.ts"
+Cohesion: 0.08
+Nodes (55): ActivityPage(), ItemDetailPage(), LaterPage(), View, FeedList(), FindsRow(), Lately(), ItemCard() (+47 more)
 
 ### Community 1 - "utils.ts"
 Cohesion: 0.12
-Nodes (38): ItemDetailPage(), NotesBox(), HomePage(), choose(), LittleMoment(), NextSaturday(), PickList(), PHRASE (+30 more)
+Nodes (36): HomePage(), RECENT(), choose(), LittleMoment(), PHRASE, PickForUs(), Picker(), PickSheet() (+28 more)
 
 ### Community 2 - "compilerOptions"
-Cohesion: 0.07
-Nodes (29): dom, dom.iterable, esnext, **/*.mts, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules (+21 more)
+Cohesion: 0.06
+Nodes (30): dom, dom.iterable, esnext, **/*.mts, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules (+22 more)
 
 ### Community 3 - "remote.ts"
-Cohesion: 0.20
-Nodes (18): createCouple(), deleteItem(), fetchMyCouple(), fetchSpace(), insertItem(), itemToRow(), joinCouple(), ok() (+10 more)
+Cohesion: 0.17
+Nodes (21): createCouple(), deleteInteraction(), deleteItem(), fetchMyCouple(), fetchSpace(), insertInteraction(), insertItem(), itemToRow() (+13 more)
 
-### Community 4 - "bits.tsx"
-Cohesion: 0.09
-Nodes (38): count(), EMOJIS, UsPage(), AppGate(), AuthScreen(), AuthShell(), Onboarding(), ShareCode() (+30 more)
+### Community 4 - "session.ts"
+Cohesion: 0.08
+Nodes (47): count(), EMOJIS, ProfileCard(), UsPage(), AppGate(), AuthScreen(), AuthShell(), Onboarding() (+39 more)
 
 ### Community 5 - "store.ts"
-Cohesion: 0.19
-Nodes (31): deletePhoto(), isStoredRef(), buildSeed(), loadCouple(), addItem(), bootRemote(), commit(), FALLBACK_ME (+23 more)
+Cohesion: 0.15
+Nodes (38): NotesBox(), deletePhoto(), isStoredRef(), buildSeed(), addItem(), bootRemote(), commit(), detail() (+30 more)
 
 ### Community 6 - "devDependencies"
 Cohesion: 0.05
-Nodes (40): eslint, eslint-config-next, framer-motion, next, dependencies, framer-motion, next, react (+32 more)
+Nodes (41): eslint, eslint-config-next, framer-motion, next, dependencies, framer-motion, next, react (+33 more)
 
-### Community 7 - "media.ts"
-Cohesion: 0.27
-Nodes (10): Avatar(), blobToDataUrl(), shrinkImage(), cache, cached(), flush(), queue, resolve() (+2 more)
+### Community 7 - "route.ts"
+Cohesion: 0.24
+Nodes (15): authorized(), dynamic, GET(), readCapped(), runtime, safeFetch(), assertPublicUrl(), decodeEntities() (+7 more)
 
 ### Community 8 - "remote.test.ts"
-Cohesion: 0.18
+Cohesion: 0.16
 Nodes (10): alice, as(), b64(), bob, carol, dave, ID, jwt() (+2 more)
 
 ### Community 9 - "AddSheet.tsx"
-Cohesion: 0.06
-Nodes (49): LaterPage(), matches(), STATUS_CHIPS, StatusFilter, AddForm(), AddSheet(), Props, titlePlaceholder() (+41 more)
+Cohesion: 0.05
+Nodes (40): body, display, metadata, viewport, AddForm(), AddSheet(), Props, readDraft() (+32 more)
 
 ### Community 11 - "our saturdays"
 Cohesion: 0.17
@@ -107,29 +112,29 @@ Nodes (11): Environment variables, First-time setup, in the app, Free-tier notes
 Cohesion: 0.50
 Nodes (3): JWT_SECRET, LC_ALL, run-remote.sh script
 
-### Community 20 - "useAppUI"
-Cohesion: 0.11
-Nodes (17): body, display, metadata, viewport, TripsPage(), ProfileCard(), BottomNav(), Icons (+9 more)
+### Community 20 - "bits.tsx"
+Cohesion: 0.13
+Nodes (23): Phase, SharePage(), TripsPage(), PasteLink(), EmptyState(), ErrorState(), PillButtonProps, ScreenHeader() (+15 more)
 
 ## Knowledge Gaps
-- **114 isolated node(s):** `StatusFilter`, `STATUS_CHIPS`, `display`, `body`, `metadata` (+109 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 137 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **129 isolated node(s):** `runtime`, `dynamic`, `View`, `display`, `body` (+124 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 155 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `SavedItem` connect `AddSheet.tsx` to `utils.ts`, `remote.ts`, `bits.tsx`, `store.ts`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `useStore()` connect `utils.ts` to `AddSheet.tsx`, `bits.tsx`, `store.ts`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
-- **Why does `CategoryId` connect `AddSheet.tsx` to `utils.ts`?**
+- **Why does `SavedItem` connect `types.ts` to `utils.ts`, `remote.ts`, `session.ts`, `store.ts`, `AddSheet.tsx`, `bits.tsx`?**
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Why does `useAppUI()` connect `utils.ts` to `types.ts`, `AddSheet.tsx`, `bits.tsx`, `session.ts`?**
   _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **Are the 2 inferred relationships involving `useStore()` (e.g. with `getSnapshot()` and `subscribe()`) actually correct?**
-  _`useStore()` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `StatusFilter`, `STATUS_CHIPS`, `display` to the rest of the system?**
-  _114 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `useShared()` connect `types.ts` to `utils.ts`, `store.ts`?**
+  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **What connects `runtime`, `dynamic`, `View` to the rest of the system?**
+  _129 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `types.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.07789473684210527 - nodes in this community are weakly interconnected._
 - **Should `utils.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.11524822695035461 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1178743961352657 - nodes in this community are weakly interconnected._
 - **Should `compilerOptions` be split into smaller, more focused modules?**
-  _Cohesion score 0.06666666666666667 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
