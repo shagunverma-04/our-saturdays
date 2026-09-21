@@ -183,5 +183,81 @@ select pg_temp.expect_count($$select 1 from public.memory_photos$$, 0);
 select pg_temp.as_admin();
 select pg_temp.expect_count($$select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename in ('memories','memory_photos')$$, 2);
 
+-- ── 005: drawings, trips, plans.time, games, calendar_links ─────────────────────────────────────────────
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+insert into public.drawings (couple_id, storage_path, caption) values (:'a_couple', 'sb:x/drawings/1.png', 'for you');
+select id as draw_id from public.drawings \gset
+select pg_temp.expect_error(format($$insert into public.drawings (couple_id, storage_path, created_by) values (%L, 'sb:x/2.png', '00000000-0000-0000-0000-00000000000b')$$, :'a_couple'), 'row-level security');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_count($$select 1 from public.drawings$$, 1);
+update public.drawings set seen_by = array[auth.uid()] where id = :'draw_id';                      -- partner may mark it seen
+select pg_temp.expect_error(format($$update public.drawings set caption = 'defaced' where id = %L$$, :'draw_id'), 'only the artist');
+select pg_temp.expect_error(format($$update public.drawings set storage_path = 'sb:evil.png' where id = %L$$, :'draw_id'), 'only the artist');
+select pg_temp.expect_error(format($$update public.drawings set seen_by = '{}' where id = %L$$, :'draw_id'), 'can only grow');
+delete from public.drawings where id = :'draw_id';                                                 -- not the artist: 0 rows
+select pg_temp.expect_count($$select 1 from public.drawings$$, 1);
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_count($$select 1 from public.drawings$$, 0);
+select pg_temp.expect_error(format($$insert into public.drawings (couple_id, storage_path) values (%L, 'sb:evil.png')$$, :'a_couple'), 'row-level security');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+update public.drawings set caption = 'still mine' where id = :'draw_id';
+delete from public.drawings where id = :'draw_id';
+select pg_temp.expect_count($$select 1 from public.drawings$$, 0);
+
+-- trips: new columns; partner edits; outsider blocked; a memory can't be tagged to someone else's trip
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+insert into public.trips (couple_id, title, destination, start_date, end_date, budget_estimate) values (:'a_couple', 'Goa 2026', 'Goa', '2026-10-24', '2026-10-28', 12000);
+select id as trip_id from public.trips where title = 'Goa 2026' \gset
+insert into public.trip_items (trip_id, item_type, title, location, scheduled_date, scheduled_time) values (:'trip_id', 'other', 'Breakfast', 'Fontainhas', '2026-10-25', '09:00');
+insert into public.trip_expenses (trip_id, category, amount, description) values (:'trip_id', 'food', 450.50, 'thali');
+select pg_temp.expect_error(format($$update public.trips set budget_estimate = -1 where id = %L$$, :'trip_id'), 'check constraint');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+update public.trips set budget_estimate = 15000 where id = :'trip_id';
+insert into public.trip_items (trip_id, item_type, title) values (:'trip_id', 'place', 'Fort Aguada');
+select pg_temp.expect_count(format($$select 1 from public.trip_items where trip_id = %L$$, :'trip_id'), 2);
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_count($$select 1 from public.trip_items$$, 0);
+select pg_temp.expect_count($$select 1 from public.trip_expenses$$, 0);
+select pg_temp.expect_error(format($$insert into public.trip_items (trip_id, item_type, title) values (%L, 'place', 'evil')$$, :'trip_id'), 'row-level security');
+select pg_temp.expect_error(format($$insert into public.memories (couple_id, title, trip_id) select id, 'x', %L from public.couples$$, :'trip_id'), 'row-level security');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+insert into public.memories (couple_id, title, trip_id) values (:'a_couple', 'beach day', :'trip_id');
+select pg_temp.expect_count($$select 1 from public.memories where trip_id is not null$$, 1);
+delete from public.trips where id = :'trip_id';                                                     -- items/expenses cascade, memory just untagged
+select pg_temp.expect_count($$select 1 from public.trip_items where title in ('Breakfast', 'Fort Aguada')$$, 0);
+select pg_temp.expect_count($$select 1 from public.trip_expenses where description = 'thali'$$, 0);
+select pg_temp.expect_count($$select 1 from public.memories where title = 'beach day' and trip_id is null$$, 1);
+
+-- plans.time
+insert into public.plans (couple_id, title, date, category, time) values (:'a_couple', 'Pottery', '2026-09-26', 'do', '18:00');
+select pg_temp.expect_count($$select 1 from public.plans where time = '18:00'$$, 1);
+
+-- games: history via attempts; one shared row per subject; outsider blocked
+insert into public.games (couple_id, type, prompt, answer, hint) values (:'a_couple', 'guess_word', 'what is it?', 'pottery', 'we keep saying we should');
+insert into public.games (couple_id, type, prompt, answer) values (:'a_couple', 'who_saved', 'item-1', 'alice');
+select pg_temp.expect_error(format($$insert into public.games (couple_id, type, prompt, answer) values (%L, 'who_saved', 'item-1', 'x')$$, :'a_couple'), 'duplicate key');
+select id as game_id from public.games where type = 'guess_word' \gset
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+insert into public.game_attempts (game_id, guess, correct) values (:'game_id', 'ramen', false), (:'game_id', 'pottery', true);
+select pg_temp.expect_error(format($$insert into public.game_attempts (game_id, guess, user_id) values (%L, 'x', '00000000-0000-0000-0000-00000000000a')$$, :'game_id'), 'row-level security');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_count($$select 1 from public.game_attempts$$, 2);
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_count($$select 1 from public.games$$, 0);
+select pg_temp.expect_count($$select 1 from public.game_attempts$$, 0);
+select pg_temp.expect_error(format($$insert into public.game_attempts (game_id, guess) values (%L, 'pottery')$$, :'game_id'), 'row-level security');
+
+-- calendar_links: private even from your partner
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+insert into public.calendar_links (url) values ('https://calendar.google.com/calendar/ical/secret/basic.ics');
+select pg_temp.expect_error($$insert into public.calendar_links (url) values ('ftp://nope')$$, 'check constraint');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_count($$select 1 from public.calendar_links$$, 0);                            -- partner cannot see it
+select pg_temp.expect_error($$insert into public.calendar_links (user_id, url) values ('00000000-0000-0000-0000-00000000000a', 'https://evil.example/x.ics')$$, 'row-level security');
+update public.calendar_links set url = 'https://evil.example/x.ics';                               -- 0 rows: not his
+select pg_temp.as_admin();
+select pg_temp.expect_count($$select 1 from public.calendar_links where url like '%secret%'$$, 1);
+select pg_temp.expect_count($$select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename in ('drawings','trips','trip_items','trip_expenses','games','game_attempts')$$, 6);
+
 -- 002 is idempotent (re-run safe) — checked by the runner script.
 select 'ALL RLS TESTS PASSED' as result;

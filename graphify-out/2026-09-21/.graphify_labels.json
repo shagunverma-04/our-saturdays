@@ -1,11 +1,12 @@
 {
+  "0": "types.ts",
   "1": "utils.ts",
   "2": "compilerOptions",
   "3": "remote.ts",
-  "4": "bits.tsx",
+  "4": "session.ts",
   "5": "store.ts",
   "6": "devDependencies",
-  "7": "media.ts",
+  "7": "route.ts",
   "8": "remote.test.ts",
   "9": "AddSheet.tsx",
   "10": "route.tsx",
@@ -18,5 +19,5 @@
   "17": "CLAUDE.md",
   "18": "run-remote.sh",
   "19": "run.sh",
-  "20": "useAppUI"
+  "20": "bits.tsx"
 }

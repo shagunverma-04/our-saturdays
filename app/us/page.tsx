@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { ShareCode } from "@/components/auth/ShareCode";
 import { useAppUI } from "@/components/ui/AppUI";
@@ -59,15 +60,14 @@ export default function UsPage() {
       <section aria-labelledby="games-h" className="mt-8">
         <h2 id="games-h" className="px-1 font-display text-2xl font-bold tracking-tight">games</h2>
         <div className="mt-3 grid grid-cols-3 gap-3">
-          {[["🔤", "guess the word"], ["🕵️", "who saved this?"], ["📷", "remember when?"]].map(([e, l]) => (
-            <div key={l} className="flex flex-col items-center gap-2 rounded-[24px] bg-card px-2 py-4 text-center opacity-70 shadow-soft">
+          {[["🔤", "guess the word", "guess"], ["🕵️", "who saved this?", "who"], ["📷", "remember when?", "remember"]].map(([e, l, t]) => (
+            <Link key={t} href={`/games?tab=${t}`} className="flex flex-col items-center gap-2 rounded-[24px] bg-card px-2 py-4 text-center shadow-soft active:scale-95">
               <span aria-hidden className="text-3xl">{e}</span>
               <span className="text-[13px] font-medium leading-tight">{l}</span>
-              <span className="text-[10px] text-mute">soon</span>
-            </div>
+            </Link>
           ))}
         </div>
-        <p className="mt-2 px-1 text-sm text-mute">a taste of &quot;who saved this?&quot; already lives on home.</p>
+        <Link href="/draw" className="mt-3 flex h-14 items-center gap-3 rounded-[24px] bg-card px-5 shadow-soft active:scale-[0.99]"><span aria-hidden className="text-2xl">🎨</span><span className="font-semibold">the drawing board</span></Link>
       </section>
 
       <section aria-labelledby="look-h" className="mt-8">

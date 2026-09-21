@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { FindsRow } from "@/components/home/FindsRow";
-import { Lately } from "@/components/home/Lately";
+import { DrawingPeek } from "@/components/home/DrawingPeek";
 import { LittleMoment } from "@/components/home/LittleMoment";
 import { MemoryPeek } from "@/components/home/MemoryPeek";
 import { PasteLink } from "@/components/home/PasteLink";
 import { PickForUs } from "@/components/home/PickForUs";
 import { SaturdaySection } from "@/components/home/SaturdaySection";
+import { TripPeek } from "@/components/home/TripPeek";
 import { Avatar, EmptyState, PillButton, Skeleton } from "@/components/ui/bits";
 import { useAppUI } from "@/components/ui/AppUI";
 import { greeting } from "@/lib/greeting";
@@ -49,7 +50,10 @@ export default function HomePage() {
       ) : (
         <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
           <div className="space-y-4 lg:order-1">
-            <div className="flex px-1"><PasteLink /></div>
+            <div className="flex flex-wrap gap-2 px-1">
+              <PasteLink />
+              <Link href="/draw" className="glass flex h-11 items-center gap-2 rounded-full px-4 text-[14px] font-semibold shadow-soft"><span aria-hidden>🎨</span> draw</Link>
+            </div>
             <SaturdaySection />
           </div>
           <div className="lg:order-3 lg:col-span-2 space-y-6">
@@ -60,9 +64,10 @@ export default function HomePage() {
             <FindsRow title={partner ? `from ${partner.name}` : "from them"} items={fromThem} />
           </div>
           <div className="space-y-8 lg:order-2">
+            <DrawingPeek />
+            <TripPeek />
             <MemoryPeek />
             <PickForUs />
-            <Lately />
             <LittleMoment />
           </div>
         </div>

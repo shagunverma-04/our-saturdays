@@ -5,7 +5,7 @@
 // We only ever store the link: no scraping of Instagram/TikTok, no paid APIs.
 
 import { findItemByUrl, getItemNow, addItem, updateItem } from "./store";
-import { getSupabase, isSupabaseConfigured } from "./supabase/client";
+import { authHeaders } from "./apiClient";
 import type { CategoryId, SavedItem } from "./types";
 import { normalizeUrl, sourceInfo, sourceWord } from "./utils";
 
@@ -44,12 +44,7 @@ export interface Preview {
 
 export async function fetchPreview(url: string): Promise<Preview | null> {
   try {
-    const headers: Record<string, string> = {};
-    if (isSupabaseConfigured) {
-      const { data } = await getSupabase().auth.getSession();
-      if (data.session) headers.authorization = `Bearer ${data.session.access_token}`;
-    }
-    const r = await fetch(`/api/preview?url=${encodeURIComponent(normalizeUrl(url))}`, { headers });
+    const r = await fetch(`/api/preview?url=${encodeURIComponent(normalizeUrl(url))}`, { headers: await authHeaders() });
     return r.ok ? ((await r.json()) as Preview) : null;
   } catch {
     return null; // offline or blocked: the placeholder title stands

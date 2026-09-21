@@ -25,6 +25,8 @@ export interface SavedItem {
   release_date: string; // YYYY-MM-DD or ""
   notes: string;
   tags: string[];
+  latitude?: number | null; // filled in when you tap "show on map"
+  longitude?: number | null;
   created_at: string; // ISO
   updated_at: string; // ISO
 }
@@ -35,6 +37,7 @@ export interface Plan {
   date: string; // YYYY-MM-DD
   category: CategoryId;
   saved_item_id: string | null;
+  time?: string | null; // HH:MM, optional ("saturday · 6 pm")
   created_at: string;
 }
 
@@ -61,8 +64,83 @@ export interface Memory {
   date: string; // YYYY-MM-DD — when it happened, not when it was saved
   location: string;
   saved_item_id: string | null; // the find this came from, if any ("it becomes a memory")
+  trip_id?: string | null; // the trip it belongs to, if any
   photos: string[]; // ordered photo references (see lib/media.ts)
   created_at: string;
 }
 
 export type NewMemoryInput = Pick<Memory, "title"> & Partial<Omit<Memory, "id" | "created_by" | "created_at" | "title">>;
+
+// ---- drawings, trips, games ---------------------------------------------------
+
+/** A doodle one of you sent the other. `image` is a photo-style reference (see lib/media.ts). */
+export interface Drawing {
+  id: string;
+  created_by: string;
+  image: string;
+  caption: string;
+  seen_by: string[];
+  created_at: string;
+}
+
+export type TripItemType = "place" | "food" | "stay" | "activity" | "other";
+export type ExpenseCategory = "stay" | "food" | "travel" | "activities" | "shopping" | "other";
+
+export interface TripItem {
+  id: string;
+  trip_id: string;
+  saved_item_id: string | null; // the find it came from, if any
+  item_type: TripItemType;
+  title: string;
+  location: string;
+  scheduled_date: string; // YYYY-MM-DD or "" (not on the itinerary yet)
+  scheduled_time: string; // HH:MM or ""
+  notes: string;
+}
+
+export interface TripExpense {
+  id: string;
+  trip_id: string;
+  category: ExpenseCategory;
+  amount: number;
+  description: string;
+  paid_by: string | null;
+  created_at: string;
+}
+
+export interface Trip {
+  id: string;
+  title: string;
+  destination: string;
+  start_date: string; // YYYY-MM-DD or ""
+  end_date: string;
+  notes: string;
+  budget_estimate: number | null;
+  created_at: string;
+  items: TripItem[];
+  expenses: TripExpense[];
+}
+
+export type NewTripInput = Pick<Trip, "title"> & Partial<Pick<Trip, "destination" | "start_date" | "end_date" | "notes" | "budget_estimate">>;
+
+export type GameType = "guess_word" | "who_saved" | "remember_when";
+
+export interface GameAttempt {
+  id: string;
+  game_id: string;
+  user_id: string;
+  guess: string;
+  correct: boolean;
+  created_at: string;
+}
+
+export interface Game {
+  id: string;
+  type: GameType;
+  created_by: string;
+  prompt: string; // guess_word: the question; who_saved / remember_when: the id of the find / memory
+  answer: string;
+  hint: string;
+  created_at: string;
+  attempts: GameAttempt[];
+}

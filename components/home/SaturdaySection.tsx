@@ -10,7 +10,8 @@ import { PillButton } from "@/components/ui/bits";
 import { useAppUI } from "@/components/ui/AppUI";
 import { iconFor, itemEmoji } from "@/lib/categories";
 import { saturdayCandidates } from "@/lib/shared";
-import { planItem, setStatus } from "@/lib/store";
+import { planItem, setPlanTime, setStatus } from "@/lib/store";
+import { formatTime12, whenLabel } from "@/lib/calendar";
 import { useShared } from "@/lib/useShared";
 import { countdown, daysUntil, nextSaturday, shortDate, toISODate } from "@/lib/utils";
 import { PickSheet } from "./PickSheet";
@@ -70,7 +71,15 @@ export function SaturdaySection() {
                 </h2>
                 {planned.location_name && <p className="text-[15px] text-ink/60">📍 {planned.location_name}</p>}
               </Link>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[15px] font-semibold">{whenLabel(plan.date, plan.time)}</span>
+                <label className="relative flex h-9 items-center rounded-full bg-ink/[0.07] px-3.5 text-[13px] font-semibold">
+                  {plan.time ? `🕕 ${formatTime12(plan.time)}` : "＋ add a time"}
+                  <input type="time" value={plan.time ?? ""} onChange={(e) => setPlanTime(plan.id, e.target.value || null)} aria-label="time (optional)" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                </label>
+                {plan.time && <button type="button" onClick={() => setPlanTime(plan.id, null)} aria-label="clear the time" className="flex h-9 w-9 items-center justify-center rounded-full bg-ink/[0.07] text-mute">✕</button>}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
                 <PillButton className="flex-1" onClick={() => { setStatus(planned.id, "done"); toast("we did it!", "🎉"); }}>we did it 🎉</PillButton>
                 <PillButton tone="ghost" onClick={() => setPicking(true)}>swap</PillButton>
               </div>

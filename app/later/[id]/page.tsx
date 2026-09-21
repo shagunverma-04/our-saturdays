@@ -10,6 +10,7 @@ import { useItemActions } from "@/components/later/useItemActions";
 import { useAppUI } from "@/components/ui/AppUI";
 import { Avatar, ErrorState, PillButton, Skeleton, SourceChip } from "@/components/ui/bits";
 import { AddPhotoButton } from "@/components/later/AddPhotoButton";
+import { PlaceMap } from "@/components/later/PlaceMap";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { ItemArt } from "@/components/ui/ItemArt";
 import { CATEGORY_BY_ID, iconFor } from "@/lib/categories";
@@ -142,6 +143,8 @@ export default function ItemDetailPage() {
           </Row>
         )}
       </section>
+
+      <PlaceMap key={`map-${item.id}`} item={item} />
 
       <NotesBox key={item.id} id={item.id} saved={item.notes} />
 

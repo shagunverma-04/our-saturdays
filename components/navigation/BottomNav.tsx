@@ -52,8 +52,11 @@ const NAV = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { openAdd, pickMemoryPhotos } = useAppUI();
+  const { openAdd, pickMemoryPhotos, openTrip } = useAppUI();
+  const onTripsList = pathname === "/trips";
   // on the memories screens, + means "add photos" straight away, not the save-a-find sheet
+  // no "+" on the drawing board or games: it would sit on top of the canvas
+  const noFab = pathname === "/draw" || pathname === "/games";
   const onMemories = pathname === "/memories" || pathname.startsWith("/memories/");
 
   // detail pages keep "later" lit
@@ -62,11 +65,11 @@ export function BottomNav() {
   return (
     <>
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-3 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="pointer-events-none flex w-full max-w-[460px] justify-end pr-1">
+        {!noFab && <div className="pointer-events-none flex w-full max-w-[460px] justify-end pr-1">
           <motion.button
             type="button"
-            aria-label={onMemories ? "add photos" : "add something"}
-            onClick={() => (onMemories ? pickMemoryPhotos() : openAdd())}
+            aria-label={onMemories ? "add photos" : onTripsList ? "new trip" : "add something"}
+            onClick={() => (onMemories ? pickMemoryPhotos() : onTripsList ? openTrip() : openAdd())}
             whileTap={{ scale: 0.88, rotate: 90 }}
             whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 420, damping: 16 }}
@@ -76,7 +79,7 @@ export function BottomNav() {
               <path d="M12 5v14M5 12h14" />
             </svg>
           </motion.button>
-        </div>
+        </div>}
 
         <nav aria-label="main" className="glass pointer-events-auto flex w-full max-w-[460px] items-center justify-between rounded-full p-1.5 shadow-float">
           {NAV.map((n) => {

@@ -24,6 +24,8 @@ interface Props {
   fromItem?: SavedItem;
   /** photos already chosen in the picker: they upload straight away and their date is read from the photo */
   files?: File[];
+  /** tag the new memory to this trip */
+  tripId?: string;
   /** called with the new memory's id after saving (used to jump to it in the swipe view) */
   onSaved?: (id: string) => void;
 }
@@ -47,7 +49,7 @@ function Thumb({ photoRef, onRemove }: { photoRef: string; onRemove: () => void 
   );
 }
 
-function MemoryForm({ onClose, edit, fromItem, files, onSaved }: Omit<Props, "open">) {
+function MemoryForm({ onClose, edit, fromItem, files, tripId, onSaved }: Omit<Props, "open">) {
   const { toast } = useAppUI();
   const { couple } = useSession();
   const { memories, items } = useStore();
@@ -159,7 +161,7 @@ function MemoryForm({ onClose, edit, fromItem, files, onSaved }: Omit<Props, "op
       toast("updated", "✏️");
       onSaved?.(edit.id);
     } else {
-      const m = addMemory({ ...fields, saved_item_id: fromItem?.id ?? null });
+      const m = addMemory({ ...fields, saved_item_id: fromItem?.id ?? null, trip_id: tripId ?? null });
       toast("memory kept", "📸");
       onSaved?.(m.id);
     }

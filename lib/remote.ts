@@ -2,7 +2,7 @@
 // so the store stays simple and these exact queries are integration-tested (supabase/tests/remote.test.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Interaction, InteractionType, Memory, Plan, Profile, SavedItem } from "./types";
+import type { Drawing, Game, GameAttempt, Interaction, InteractionType, Memory, Plan, Profile, SavedItem, Trip, TripExpense, TripItem } from "./types";
 
 type Row = Record<string, unknown>;
 interface Result {
@@ -32,6 +32,8 @@ export function rowToItem(r: Row): SavedItem {
     release_date: (r.release_date as string | null) ?? "",
     notes: (r.notes as string) ?? "",
     tags: (r.tags as string[] | null) ?? [],
+    latitude: (r.latitude as number | null) ?? null,
+    longitude: (r.longitude as number | null) ?? null,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
   };
@@ -52,6 +54,7 @@ export function rowToPlan(r: Row): Plan {
     date: r.date as string,
     category: r.category as Plan["category"],
     saved_item_id: (r.saved_item_id as string | null) ?? null,
+    time: r.time ? String(r.time).slice(0, 5) : null,
     created_at: r.created_at as string,
   };
 }
@@ -74,8 +77,57 @@ export function rowToMemory(r: Row): Memory {
     date: r.date as string,
     location: (r.location as string) ?? "",
     saved_item_id: (r.saved_item_id as string | null) ?? null,
+    trip_id: (r.trip_id as string | null) ?? null,
     photos,
     created_at: r.created_at as string,
+  };
+}
+
+export function rowToDrawing(r: Row): Drawing {
+  return { id: r.id as string, created_by: r.created_by as string, image: r.storage_path as string, caption: (r.caption as string) ?? "", seen_by: (r.seen_by as string[] | null) ?? [], created_at: r.created_at as string };
+}
+
+const hhmm = (v: unknown) => (v ? String(v).slice(0, 5) : "");
+export function rowToTripItem(r: Row): TripItem {
+  return {
+    id: r.id as string,
+    trip_id: r.trip_id as string,
+    saved_item_id: (r.saved_item_id as string | null) ?? null,
+    item_type: r.item_type as TripItem["item_type"],
+    title: (r.title as string) ?? "",
+    location: (r.location as string) ?? "",
+    scheduled_date: (r.scheduled_date as string | null) ?? "",
+    scheduled_time: hhmm(r.scheduled_time),
+    notes: (r.notes as string) ?? "",
+  };
+}
+export function rowToExpense(r: Row): TripExpense {
+  return { id: r.id as string, trip_id: r.trip_id as string, category: r.category as TripExpense["category"], amount: Number(r.amount), description: (r.description as string) ?? "", paid_by: (r.paid_by as string | null) ?? null, created_at: r.created_at as string };
+}
+export function rowToTrip(r: Row): Trip {
+  return {
+    id: r.id as string,
+    title: (r.title as string) ?? "",
+    destination: (r.destination as string) ?? "",
+    start_date: (r.start_date as string | null) ?? "",
+    end_date: (r.end_date as string | null) ?? "",
+    notes: (r.notes as string) ?? "",
+    budget_estimate: r.budget_estimate == null ? null : Number(r.budget_estimate),
+    created_at: r.created_at as string,
+    items: ((r.trip_items as Row[] | null) ?? []).map(rowToTripItem),
+    expenses: ((r.trip_expenses as Row[] | null) ?? []).map(rowToExpense),
+  };
+}
+export function rowToGame(r: Row): Game {
+  return {
+    id: r.id as string,
+    type: r.type as Game["type"],
+    created_by: r.created_by as string,
+    prompt: (r.prompt as string) ?? "",
+    answer: (r.answer as string) ?? "",
+    hint: (r.hint as string) ?? "",
+    created_at: r.created_at as string,
+    attempts: ((r.game_attempts as Row[] | null) ?? []).map((a) => ({ id: a.id as string, game_id: a.game_id as string, user_id: a.user_id as string, guess: (a.guess as string) ?? "", correct: Boolean(a.correct), created_at: a.created_at as string })),
   };
 }
 
@@ -89,9 +141,9 @@ export function profilePatchToRow(p: Partial<Profile>): Row {
 
 // ---- reads -----------------------------------------------------------------
 
-export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem[]; plans: Plan[]; profiles: Profile[]; interactions: Interaction[]; interactionsReady: boolean; memories: Memory[] }> {
+export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem[]; plans: Plan[]; profiles: Profile[]; interactions: Interaction[]; interactionsReady: boolean; memories: Memory[]; drawings: Drawing[]; trips: Trip[]; games: Game[] }> {
   // RLS scopes every one of these to the caller's couple, so no couple_id filter is needed (or trusted).
-  const [items, plans, profiles, inter, mems] = await Promise.all([
+  const [items, plans, profiles, inter, mems, draws, trips, games] = await Promise.all([
     ok(sb.from("saved_items").select("*").order("created_at", { ascending: false }).limit(1000)),
     ok(sb.from("plans").select("*")),
     ok(sb.from("profiles").select("id, name, avatar_emoji, avatar_url")),
@@ -99,6 +151,10 @@ export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem
     sb.from("item_interactions").select("id, saved_item_id, user_id, interaction_type, created_at").limit(5000),
     // tolerated separately, like reactions: the journal is optional until its migration has been run
     sb.from("memories").select("*, memory_photos(storage_path, display_order)").order("date", { ascending: false }).limit(1000),
+    // the newer features are each tolerated on their own: a missing migration hides that feature, never the app
+    sb.from("drawings").select("*").order("created_at", { ascending: false }).limit(500),
+    sb.from("trips").select("*, trip_items(*), trip_expenses(*)").order("start_date", { ascending: true, nullsFirst: false }).limit(200),
+    sb.from("games").select("*, game_attempts(*)").order("created_at", { ascending: false }).limit(1000),
   ]);
   return {
     items: (items.data as Row[]).map(rowToItem),
@@ -107,6 +163,9 @@ export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem
     interactions: inter.error ? [] : ((inter.data ?? []) as Row[]).map(rowToInteraction),
     interactionsReady: !inter.error,
     memories: mems.error ? [] : ((mems.data ?? []) as Row[]).map(rowToMemory),
+    drawings: draws.error ? [] : ((draws.data ?? []) as Row[]).map(rowToDrawing),
+    trips: trips.error ? [] : ((trips.data ?? []) as Row[]).map(rowToTrip),
+    games: games.error ? [] : ((games.data ?? []) as Row[]).map(rowToGame),
   };
 }
 
@@ -143,7 +202,7 @@ export async function deleteItem(sb: SupabaseClient, id: string) {
 /** Put an item on a date (one plan per date). `bumpedIds` are items that lose that date and go back to "saved". */
 export async function writePlan(sb: SupabaseClient, coupleId: string, plan: Plan, bumpedIds: string[]) {
   await ok(sb.from("plans").delete().eq("couple_id", coupleId).eq("date", plan.date));
-  await ok(sb.from("plans").insert({ id: plan.id, couple_id: coupleId, title: plan.title, date: plan.date, category: plan.category, saved_item_id: plan.saved_item_id }));
+  await ok(sb.from("plans").insert({ id: plan.id, couple_id: coupleId, title: plan.title, date: plan.date, category: plan.category, saved_item_id: plan.saved_item_id, time: plan.time || null }));
   if (plan.saved_item_id) await ok(sb.from("saved_items").update({ status: "planned" }).eq("id", plan.saved_item_id));
   if (bumpedIds.length) await ok(sb.from("saved_items").update({ status: "saved" }).in("id", bumpedIds));
 }
@@ -172,6 +231,7 @@ export async function deleteInteraction(sb: SupabaseClient, itemId: string, user
 export async function insertMemory(sb: SupabaseClient, coupleId: string, m: Memory) {
   const row: Row = { id: m.id, couple_id: coupleId, created_by: m.created_by, title: m.title, description: m.description, date: m.date, location: m.location };
   if (m.saved_item_id) row.saved_item_id = m.saved_item_id; // only when set, so this still works before the column exists
+  if (m.trip_id) row.trip_id = m.trip_id;
   await ok(sb.from("memories").insert(row));
   if (m.photos.length) await ok(sb.from("memory_photos").insert(m.photos.map((storage_path, display_order) => ({ memory_id: m.id, storage_path, display_order }))));
 }
@@ -194,6 +254,86 @@ export async function patchMemory(sb: SupabaseClient, id: string, patch: Partial
 
 export async function deleteMemory(sb: SupabaseClient, id: string) {
   await ok(sb.from("memories").delete().eq("id", id)); // photo rows go with it (cascade)
+}
+
+export async function setPlanTime(sb: SupabaseClient, planId: string, time: string | null) {
+  await ok(sb.from("plans").update({ time: time || null }).eq("id", planId));
+}
+
+// ---- drawings ------------------------------------------------------------------
+
+export async function insertDrawing(sb: SupabaseClient, coupleId: string, d: Drawing) {
+  await ok(sb.from("drawings").insert({ id: d.id, couple_id: coupleId, created_by: d.created_by, storage_path: d.image, caption: d.caption }));
+}
+/** Add yourself to seen_by (the database only lets a partner grow that list). */
+export async function markDrawingSeen(sb: SupabaseClient, id: string, seenBy: string[]) {
+  await ok(sb.from("drawings").update({ seen_by: seenBy }).eq("id", id));
+}
+export async function deleteDrawing(sb: SupabaseClient, id: string) {
+  await ok(sb.from("drawings").delete().eq("id", id));
+}
+
+// ---- trips ---------------------------------------------------------------------
+
+const tripFields = (t: Partial<Trip>): Row => {
+  const row: Row = {};
+  if (t.title !== undefined) row.title = t.title;
+  if (t.destination !== undefined) row.destination = t.destination;
+  if (t.start_date !== undefined) row.start_date = t.start_date || null;
+  if (t.end_date !== undefined) row.end_date = t.end_date || null;
+  if (t.notes !== undefined) row.notes = t.notes;
+  if (t.budget_estimate !== undefined) row.budget_estimate = t.budget_estimate;
+  return row;
+};
+const tripItemFields = (i: Partial<TripItem>): Row => {
+  const row: Row = {};
+  if (i.saved_item_id !== undefined) row.saved_item_id = i.saved_item_id;
+  if (i.item_type !== undefined) row.item_type = i.item_type;
+  if (i.title !== undefined) row.title = i.title;
+  if (i.location !== undefined) row.location = i.location;
+  if (i.scheduled_date !== undefined) row.scheduled_date = i.scheduled_date || null;
+  if (i.scheduled_time !== undefined) row.scheduled_time = i.scheduled_time || null;
+  if (i.notes !== undefined) row.notes = i.notes;
+  return row;
+};
+
+export async function insertTrip(sb: SupabaseClient, coupleId: string, t: Trip) {
+  await ok(sb.from("trips").insert({ id: t.id, couple_id: coupleId, ...tripFields(t) }));
+}
+export async function patchTrip(sb: SupabaseClient, id: string, patch: Partial<Trip>) {
+  await ok(sb.from("trips").update(tripFields(patch)).eq("id", id));
+}
+export async function deleteTrip(sb: SupabaseClient, id: string) {
+  await ok(sb.from("trips").delete().eq("id", id)); // items + expenses cascade; memories are just untagged
+}
+export async function insertTripItem(sb: SupabaseClient, i: TripItem) {
+  await ok(sb.from("trip_items").insert({ id: i.id, trip_id: i.trip_id, ...tripItemFields(i) }));
+}
+export async function patchTripItem(sb: SupabaseClient, id: string, patch: Partial<TripItem>) {
+  await ok(sb.from("trip_items").update(tripItemFields(patch)).eq("id", id));
+}
+export async function deleteTripItem(sb: SupabaseClient, id: string) {
+  await ok(sb.from("trip_items").delete().eq("id", id));
+}
+export async function insertExpense(sb: SupabaseClient, e: TripExpense) {
+  await ok(sb.from("trip_expenses").insert({ id: e.id, trip_id: e.trip_id, category: e.category, amount: e.amount, description: e.description, paid_by: e.paid_by }));
+}
+export async function deleteExpense(sb: SupabaseClient, id: string) {
+  await ok(sb.from("trip_expenses").delete().eq("id", id));
+}
+
+// ---- games ---------------------------------------------------------------------
+
+export async function insertGame(sb: SupabaseClient, coupleId: string, g: Game) {
+  const { error } = await sb.from("games").insert({ id: g.id, couple_id: coupleId, type: g.type, created_by: g.created_by, prompt: g.prompt, answer: g.answer, hint: g.hint });
+  // who_saved / remember_when are one shared row per subject: if your partner created it a moment ago, that's fine
+  if (error && !(error as { code?: string }).code?.startsWith("23505")) throw new Error(error.message);
+}
+export async function insertAttempt(sb: SupabaseClient, a: GameAttempt) {
+  await ok(sb.from("game_attempts").insert({ id: a.id, game_id: a.game_id, user_id: a.user_id, guess: a.guess, correct: a.correct }));
+}
+export async function deleteGame(sb: SupabaseClient, id: string) {
+  await ok(sb.from("games").delete().eq("id", id));
 }
 
 // ---- couples (RPC — members can't insert into couples directly) ------------

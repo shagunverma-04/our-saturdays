@@ -1,14 +1,14 @@
 {
   "0": "types.ts",
-  "1": "utils.ts",
+  "1": "RememberTab.tsx",
   "2": "compilerOptions",
   "3": "remote.ts",
   "4": "session.ts",
   "5": "store.ts",
   "6": "devDependencies",
-  "7": "route.ts",
+  "7": "preview-safe.ts",
   "8": "remote.test.ts",
-  "9": "AddSheet.tsx",
+  "9": "AppUI.tsx",
   "10": "route.tsx",
   "11": "our saturdays",
   "12": "AGENTS.md",
@@ -19,5 +19,9 @@
   "17": "CLAUDE.md",
   "18": "run-remote.sh",
   "19": "run.sh",
-  "20": "bits.tsx"
+  "20": "AddSheet.tsx",
+  "21": "TripTabs.tsx",
+  "22": "ical.ts",
+  "23": "bits.tsx",
+  "24": "DrawingBoard.tsx"
 }

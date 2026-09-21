@@ -166,6 +166,121 @@ await step("memories: deleting removes its photos; deleting the find only unlink
   await r.deleteMemory(bob, m2.id);
   assert.equal((await r.fetchSpace(alice)).memories.some((m) => m.id === m2.id), false);
 });
+const draw = (o: Partial<import("../../lib/types.ts").Drawing> = {}) => ({ id: crypto.randomUUID(), created_by: ID.alice, image: "sb:c/drawings/1.png", caption: "for you", seen_by: [] as string[], created_at: new Date().toISOString(), ...o });
+await step("drawings: alice sends one; bob sees it, marks it seen, can't repaint it; only she can delete it", async () => {
+  const d = draw();
+  await r.insertDrawing(alice, coupleId, d);
+  let got = (await r.fetchSpace(bob)).drawings.find((x) => x.id === d.id)!;
+  assert.ok(got); assert.deepEqual([got.image, got.caption, got.seen_by], ["sb:c/drawings/1.png", "for you", []]);
+  await r.markDrawingSeen(bob, d.id, [ID.bob]);
+  got = (await r.fetchSpace(alice)).drawings.find((x) => x.id === d.id)!;
+  assert.deepEqual(got.seen_by, [ID.bob]);
+  await r.deleteDrawing(bob, d.id);                                            // not the artist → 0 rows
+  assert.equal((await r.fetchSpace(alice)).drawings.some((x) => x.id === d.id), true);
+  assert.equal((await r.fetchSpace(carol)).drawings.length, 0);
+  await r.deleteDrawing(alice, d.id);
+  assert.equal((await r.fetchSpace(bob)).drawings.some((x) => x.id === d.id), false);
+});
+
+const tid = crypto.randomUUID();
+const trip = { id: tid, title: "Goa", destination: "Goa", start_date: "2026-10-24", end_date: "2026-10-27", notes: "", budget_estimate: 12000, created_at: "", items: [], expenses: [] };
+await step("trips: create, read back with dates and budget; partner edits it", async () => {
+  await r.insertTrip(alice, coupleId, trip);
+  let got = (await r.fetchSpace(bob)).trips.find((t) => t.id === tid)!;
+  assert.deepEqual([got.title, got.start_date, got.end_date, got.budget_estimate, got.items.length], ["Goa", "2026-10-24", "2026-10-27", 12000, 0]);
+  await r.patchTrip(bob, tid, { budget_estimate: 15000, notes: "book the hotel", end_date: "" });
+  got = (await r.fetchSpace(alice)).trips.find((t) => t.id === tid)!;
+  assert.deepEqual([got.budget_estimate, got.notes, got.end_date], [15000, "book the hotel", ""]);
+  await r.patchTrip(alice, tid, { budget_estimate: null, end_date: "2026-10-27" });
+  assert.equal((await r.fetchSpace(alice)).trips.find((t) => t.id === tid)!.budget_estimate, null);
+});
+await step("trips: itinerary items (with/without a time), schedule one, unschedule it", async () => {
+  const a = { id: crypto.randomUUID(), trip_id: tid, saved_item_id: null, item_type: "food" as const, title: "Fish thali", location: "Panjim", scheduled_date: "2026-10-25", scheduled_time: "13:30", notes: "" };
+  const b = { ...a, id: crypto.randomUUID(), item_type: "place" as const, title: "Fort Aguada", location: "", scheduled_date: "", scheduled_time: "" };
+  await r.insertTripItem(alice, a); await r.insertTripItem(bob, b);
+  let t = (await r.fetchSpace(alice)).trips.find((x) => x.id === tid)!;
+  const ga = t.items.find((i) => i.id === a.id)!, gb = t.items.find((i) => i.id === b.id)!;
+  assert.deepEqual([ga.scheduled_date, ga.scheduled_time, ga.location, ga.item_type], ["2026-10-25", "13:30", "Panjim", "food"], "HH:MM (not HH:MM:SS)");
+  assert.deepEqual([gb.scheduled_date, gb.scheduled_time], ["", ""]);
+  await r.patchTripItem(alice, b.id, { scheduled_date: "2026-10-26", scheduled_time: "16:00" });
+  await r.patchTripItem(bob, a.id, { scheduled_date: "", scheduled_time: "" });
+  t = (await r.fetchSpace(bob)).trips.find((x) => x.id === tid)!;
+  assert.deepEqual(t.items.find((i) => i.id === b.id)!.scheduled_time, "16:00");
+  assert.deepEqual(t.items.find((i) => i.id === a.id)!.scheduled_date, "");
+  await r.deleteTripItem(alice, b.id);
+  assert.equal((await r.fetchSpace(alice)).trips.find((x) => x.id === tid)!.items.length, 1);
+});
+await step("trips: expenses add up exactly; outsider sees and changes nothing", async () => {
+  await r.insertExpense(alice, { id: crypto.randomUUID(), trip_id: tid, category: "food", amount: 450.5, description: "thali", paid_by: ID.alice, created_at: "" });
+  const e2 = { id: crypto.randomUUID(), trip_id: tid, category: "stay" as const, amount: 3000, description: "night 1", paid_by: null, created_at: "" };
+  await r.insertExpense(bob, e2);
+  const t = (await r.fetchSpace(alice)).trips.find((x) => x.id === tid)!;
+  assert.equal(t.expenses.reduce((s, e) => s + e.amount, 0), 3450.5);
+  assert.equal(typeof t.expenses[0].amount, "number", "numeric column comes back as a number");
+  const c = (await r.fetchSpace(carol));
+  assert.equal(c.trips.length, 0);
+  await r.deleteExpense(carol, e2.id); await r.patchTrip(carol, tid, { title: "HACKED" }); await r.deleteTrip(carol, tid);
+  const still = (await r.fetchSpace(alice)).trips.find((x) => x.id === tid)!;
+  assert.deepEqual([still.title, still.expenses.length], ["Goa", 2]);
+  await assert.rejects(r.insertTripItem(carol, { id: crypto.randomUUID(), trip_id: tid, saved_item_id: null, item_type: "place", title: "evil", location: "", scheduled_date: "", scheduled_time: "", notes: "" }), /row-level security/);
+});
+await step("trips: a memory can be tagged to a trip, and survives the trip being deleted", async () => {
+  const m = { id: crypto.randomUUID(), created_by: ID.alice, title: "beach day", description: "", date: "2026-10-25", location: "Baga", saved_item_id: null, trip_id: tid, photos: [] as string[], created_at: new Date().toISOString() };
+  await r.insertMemory(alice, coupleId, m);
+  assert.equal((await r.fetchSpace(bob)).memories.find((x) => x.id === m.id)!.trip_id, tid);
+  await r.patchMemory(bob, m.id, { trip_id: null }, []);
+  assert.equal((await r.fetchSpace(alice)).memories.find((x) => x.id === m.id)!.trip_id, null);
+  await r.patchMemory(bob, m.id, { trip_id: tid }, []);
+  await r.deleteTrip(alice, tid);
+  const after = await r.fetchSpace(alice);
+  assert.equal(after.trips.some((t) => t.id === tid), false);
+  assert.equal(after.memories.find((x) => x.id === m.id)!.trip_id, null, "memory kept, just untagged");
+  assert.equal(after.memories.some((x) => x.id === m.id), true);
+});
+
+await step("plans: an optional time round-trips as HH:MM", async () => {
+  const plan = { id: crypto.randomUUID(), title: "Pottery", date: "2026-09-26", category: "do" as const, saved_item_id: ramen.id, time: "18:00", created_at: "" };
+  await r.writePlan(alice, coupleId, plan, []);
+  let got = (await r.fetchSpace(bob)).plans.find((p) => p.id === plan.id)!;
+  assert.equal(got.time, "18:00");
+  await r.setPlanTime(bob, plan.id, null);
+  got = (await r.fetchSpace(alice)).plans.find((p) => p.id === plan.id)!;
+  assert.equal(got.time, null);
+  await r.setPlanTime(alice, plan.id, "09:30");
+  assert.equal((await r.fetchSpace(bob)).plans.find((p) => p.id === plan.id)!.time, "09:30");
+  await r.setItemStatusOffCalendar(alice, ramen.id, "saved");
+});
+
+await step("games: guess-the-word history; who-saved is one shared row however many times it's created", async () => {
+  const g = { id: crypto.randomUUID(), type: "guess_word" as const, created_by: ID.alice, prompt: "what is it?", answer: "pottery", hint: "we keep saying we should", created_at: "", attempts: [] };
+  await r.insertGame(alice, coupleId, g);
+  const at = (correct: boolean, guess: string) => ({ id: crypto.randomUUID(), game_id: g.id, user_id: ID.bob, guess, correct, created_at: "" });
+  await r.insertAttempt(bob, at(false, "ramen")); await r.insertAttempt(bob, at(true, "pottery"));
+  const got = (await r.fetchSpace(alice)).games.find((x) => x.id === g.id)!;
+  assert.deepEqual([got.answer, got.hint, got.attempts.length, got.attempts.filter((a) => a.correct).length], ["pottery", "we keep saying we should", 2, 1]);
+  const w1 = { ...g, id: crypto.randomUUID(), type: "who_saved" as const, prompt: ramen.id, answer: ID.alice, hint: "" };
+  await r.insertGame(alice, coupleId, w1);
+  await r.insertGame(bob, coupleId, { ...w1, id: crypto.randomUUID(), created_by: ID.bob });             // same subject again: quietly ignored, not an error
+  assert.equal((await r.fetchSpace(alice)).games.filter((x) => x.type === "who_saved" && x.prompt === ramen.id).length, 1);
+  await r.insertAttempt(bob, { id: crypto.randomUUID(), game_id: w1.id, user_id: ID.bob, guess: ID.alice, correct: true, created_at: "" });
+  assert.equal((await r.fetchSpace(alice)).games.find((x) => x.id === w1.id)!.attempts.length, 1);
+  assert.equal((await r.fetchSpace(carol)).games.length, 0);
+  await assert.rejects(r.insertAttempt(carol, at(true, "pottery")), /row-level security|violates/);
+  await r.deleteGame(alice, g.id);
+  assert.equal((await r.fetchSpace(bob)).games.some((x) => x.id === g.id), false);
+});
+
+await step("calendar link: saved for you, invisible to your partner, clearable", async () => {
+  assert.equal(await r.getCalendarLink(alice, ID.alice), "");
+  await r.setCalendarLink(alice, ID.alice, "https://calendar.google.com/calendar/ical/x/basic.ics");
+  assert.equal(await r.getCalendarLink(alice, ID.alice), "https://calendar.google.com/calendar/ical/x/basic.ics");
+  assert.equal(await r.getCalendarLink(bob, ID.alice), "", "your partner can't read your private calendar address");
+  await r.setCalendarLink(alice, ID.alice, "https://example.com/new.ics");
+  assert.equal(await r.getCalendarLink(alice, ID.alice), "https://example.com/new.ics", "updating replaces, not duplicates");
+  await assert.rejects(r.setCalendarLink(bob, ID.bob, "ftp://nope"), /check|violates/);
+  await r.setCalendarLink(alice, ID.alice, "");
+  assert.equal(await r.getCalendarLink(alice, ID.alice), "");
+});
 await step("delete removes the item and its plans", async () => {
   await r.writePlan(alice, coupleId, { id: crypto.randomUUID(), title: "Ramen", date, category: "eat", saved_item_id: ramen.id, created_at: "" }, []);
   await r.deleteItem(bob, ramen.id);

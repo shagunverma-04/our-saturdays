@@ -1,4 +1,4 @@
-import type { CategoryId, Interaction, InteractionType, Memory, Plan, Profile, SavedItem, Status } from "./types";
+import type { CategoryId, Game, Interaction, InteractionType, Memory, Plan, Profile, SavedItem, Status, Trip } from "./types";
 import { toISODate } from "./utils";
 
 export const DEFAULT_PROFILES: Profile[] = [
@@ -57,7 +57,7 @@ const REACTIONS: Array<[string, "u1" | "u2", InteractionType, number]> = [
   ["salsa", "u1", "interested", 2],
 ];
 
-export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]; interactions: Interaction[]; memories: Memory[] } {
+export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]; interactions: Interaction[]; memories: Memory[]; trips: Trip[]; games: Game[] } {
   const items: SavedItem[] = SEEDS.map((s) => {
     const created = new Date(now.getTime() - s.ago * DAY).toISOString();
     return {
@@ -101,5 +101,36 @@ export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]
     mem("picnic", "u2", 40, "the blanket picnic", "forgot the corkscrew. ate all the cheese anyway.", "Cubbon Park", "picnic"),
     mem("coorg", "u1", 120, "coorg, in the rain", "coffee estates, board games, zero regrets.", "Coorg", "coorg"),
   ];
-  return { items, plans: [], interactions, memories };
+  // a trip with a little of everything, and one waiting guessing game, so the new areas aren't empty in demo mode
+  const day = (n: number) => toISODate(new Date(now.getTime() + n * DAY));
+  const tripItem = (n: number, type: Trip["items"][number]["item_type"], title: string, location = "", date = "", time = ""): Trip["items"][number] => ({ id: `seed-ti-${n}`, trip_id: "seed-trip-goa", saved_item_id: null, item_type: type, title, location, scheduled_date: date, scheduled_time: time, notes: "" });
+  const trips: Trip[] = [
+    {
+      id: "seed-trip-goa",
+      title: "Goa",
+      destination: "Goa",
+      start_date: day(34),
+      end_date: day(38),
+      notes: "leave early on friday. book the scooter in advance.",
+      budget_estimate: 25000,
+      created_at: new Date(now.getTime() - 14 * DAY).toISOString(),
+      items: [
+        { ...tripItem(1, "stay", "Casa Sunset, Anjuna", "Anjuna"), saved_item_id: "seed-goa" },
+        tripItem(2, "place", "Fort Aguada", "Candolim", day(35), "10:00"),
+        tripItem(3, "place", "Fontainhas", "Panjim"),
+        tripItem(4, "food", "Fish thali", "Panjim", day(35), "13:30"),
+        tripItem(5, "activity", "Sunset cruise", "Mandovi", day(36), "17:30"),
+        tripItem(6, "activity", "Scuba diving", "Grande Island"),
+      ],
+      expenses: [
+        { id: "seed-te-1", trip_id: "seed-trip-goa", category: "stay", amount: 8500, description: "hotel deposit", paid_by: "u2", created_at: new Date(now.getTime() - 3 * DAY).toISOString() },
+        { id: "seed-te-2", trip_id: "seed-trip-goa", category: "travel", amount: 3200, description: "train tickets", paid_by: "u1", created_at: new Date(now.getTime() - 2 * DAY).toISOString() },
+      ],
+    },
+  ];
+  const games: Game[] = [
+    { id: "seed-game-1", type: "guess_word", created_by: "u2", prompt: "something we've been saying we should try for 6 months", answer: "pottery", hint: "hands, clay, mess", created_at: new Date(now.getTime() - 2 * DAY).toISOString(), attempts: [] },
+    { id: "seed-game-2", type: "who_saved", created_by: "u2", prompt: "seed-ramen", answer: "u2", hint: "", created_at: new Date(now.getTime() - 5 * DAY).toISOString(), attempts: [{ id: "seed-att-1", game_id: "seed-game-2", user_id: "u1", guess: "u2", correct: true, created_at: new Date(now.getTime() - 5 * DAY).toISOString() }] },
+  ];
+  return { items, plans: [], interactions, memories, trips, games };
 }

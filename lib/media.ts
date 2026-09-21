@@ -25,6 +25,15 @@ export async function uploadPhoto(file: File, coupleId: string | null, folder = 
   return PREFIX + path;
 }
 
+/** Upload a finished drawing as a lossless PNG (a JPEG would smudge the lines). */
+export async function uploadDrawing(blob: Blob, coupleId: string | null): Promise<string> {
+  if (!isSupabaseConfigured || !coupleId) return blobToDataUrl(blob);
+  const path = `${coupleId}/drawings/${crypto.randomUUID()}.png`;
+  const { error } = await getSupabase().storage.from(BUCKET).upload(path, blob, { contentType: "image/png", cacheControl: "3600" });
+  if (error) throw new Error(error.message);
+  return PREFIX + path;
+}
+
 /** Best-effort cleanup of a replaced/removed photo. */
 export async function deletePhoto(ref: string): Promise<void> {
   if (!isStoredRef(ref) || !isSupabaseConfigured) return;

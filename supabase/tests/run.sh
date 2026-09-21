@@ -16,5 +16,7 @@ P=(psql -h 127.0.0.1 -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -q -X)
 "${P[@]}" -f 003_interactions.sql   # idempotent
 "${P[@]}" -f 004_memories.sql
 "${P[@]}" -f 004_memories.sql   # idempotent
+"${P[@]}" -f 005_drawings_trips_games_calendar.sql
+"${P[@]}" -f 005_drawings_trips_games_calendar.sql   # idempotent
 "${P[@]}" -f 002_photos_and_realtime.sql 2>/dev/null   # idempotent
 "${P[@]}" -t -A -f tests/rls.test.sql | grep -E "PASSED|ERROR" || { echo "FAILED"; "${P[@]}" -f tests/rls.test.sql 2>&1 | grep -E "ERROR|CONTEXT" ; exit 1; }

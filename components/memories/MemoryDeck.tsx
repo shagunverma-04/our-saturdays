@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { howLongAgo, longDate } from "@/lib/memories";
 import { useMediaUrl } from "@/lib/media";
+import { useStore } from "@/lib/store";
 import type { Memory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MemoryCover } from "./MemoryCard";
@@ -95,6 +96,7 @@ interface DeckProps {
  * Built on native scroll-snap so it feels exactly like the phone's own scrolling (momentum, rubber-banding).
  */
 export function MemoryDeck({ memories, startId, onGrid, onMore }: DeckProps) {
+  const { trips } = useStore();
   const scroller = useRef<HTMLDivElement>(null);
   const startIdx = Math.max(0, memories.findIndex((m) => m.id === startId));
   const [current, setCurrent] = useState(startIdx);
@@ -143,6 +145,7 @@ export function MemoryDeck({ memories, startId, onGrid, onMore }: DeckProps) {
               </p>
               <h2 className="mt-1 font-display text-[32px] font-bold leading-[1.05] tracking-tight">{m.title}</h2>
               {m.location && <p className="mt-1.5 text-[15px] font-medium text-white/85">📍 {m.location}</p>}
+              {m.trip_id && trips.find((t) => t.id === m.trip_id) && <p className="mt-1 text-[14px] font-medium text-white/80">✈️ {trips.find((t) => t.id === m.trip_id)!.title}</p>}
               {m.description && <p className="mt-2 line-clamp-3 whitespace-pre-line text-[16px] leading-snug text-white/90">{m.description}</p>}
             </div>
           </section>

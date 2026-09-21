@@ -82,3 +82,40 @@ export const isMapsHost = (u: URL) => u.hostname === "maps.app.goo.gl" || u.host
 export const isYouTubeHost = (u: URL) => /(^|\.)youtube\.com$/.test(u.hostname) || u.hostname === "youtu.be";
 /** We never fetch these: no scraping of private-ish social content. We only keep the link. */
 export const isNoFetchHost = (u: URL) => /(^|\.)(instagram\.com|tiktok\.com|facebook\.com|fb\.watch)$/.test(u.hostname);
+
+const UA = "Mozilla/5.0 (compatible; OurSaturdays/1.0; private couple app)";
+
+/** fetch() that re-checks EVERY redirect hop against the private-address guard, with a timeout. */
+export async function safeFetch(start: URL, opts: { accept?: string; timeoutMs?: number; hops?: number } = {}): Promise<{ res: Response; finalUrl: URL }> {
+  let u = start;
+  for (let i = 0; i <= (opts.hops ?? 4); i++) {
+    await assertPublicUrl(u);
+    const res = await fetch(u, { redirect: "manual", signal: AbortSignal.timeout(opts.timeoutMs ?? 4500), headers: { "user-agent": UA, accept: opts.accept ?? "text/html,application/xhtml+xml" } });
+    const loc = res.headers.get("location");
+    if (res.status >= 300 && res.status < 400 && loc) {
+      u = new URL(loc, u);
+      continue;
+    }
+    return { res, finalUrl: u };
+  }
+  throw new Error("too many redirects");
+}
+
+/** Read at most `max` bytes of a response body as text. */
+export async function readCapped(res: Response, max: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    got += value.length;
+    if (got >= max) {
+      await reader.cancel();
+      break;
+    }
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}

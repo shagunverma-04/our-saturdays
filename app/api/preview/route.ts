@@ -1,11 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { assertPublicUrl, isMapsHost, isNoFetchHost, isYouTubeHost, mapsPlaceName, parseMeta } from "@/lib/preview-safe";
+import { isMapsHost, isNoFetchHost, isYouTubeHost, mapsPlaceName, parseMeta, readCapped as readBody, safeFetch } from "@/lib/preview-safe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UA = "Mozilla/5.0 (compatible; OurSaturdays/1.0; link preview)";
 const MAX_BYTES = 300_000;
 
 /** Only signed-in members may use this, so it can't become an open "fetch anything" proxy. */
@@ -17,39 +16,6 @@ async function authorized(req: Request): Promise<boolean> {
   if (!token) return false;
   const { data, error } = await createClient(url, key, { auth: { persistSession: false } }).auth.getUser(token);
   return !error && Boolean(data.user);
-}
-
-async function safeFetch(start: URL, hops = 4): Promise<{ res: Response; finalUrl: URL }> {
-  let u = start;
-  for (let i = 0; i <= hops; i++) {
-    await assertPublicUrl(u); // re-checked on EVERY redirect
-    const res = await fetch(u, { redirect: "manual", signal: AbortSignal.timeout(4500), headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml" } });
-    const loc = res.headers.get("location");
-    if (res.status >= 300 && res.status < 400 && loc) {
-      u = new URL(loc, u);
-      continue;
-    }
-    return { res, finalUrl: u };
-  }
-  throw new Error("too many redirects");
-}
-
-async function readCapped(res: Response): Promise<string> {
-  const reader = res.body?.getReader();
-  if (!reader) return "";
-  const chunks: Uint8Array[] = [];
-  let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    got += value.length;
-    if (got >= MAX_BYTES) {
-      await reader.cancel();
-      break;
-    }
-  }
-  return Buffer.concat(chunks).toString("utf8");
 }
 
 export async function GET(req: Request) {
@@ -77,7 +43,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ title: name, location: name, site: "Google Maps" }, { headers });
     }
     if (!res.ok || !(res.headers.get("content-type") ?? "").includes("html")) return NextResponse.json({}, { headers });
-    return NextResponse.json(parseMeta(await readCapped(res), finalUrl), { headers });
+    return NextResponse.json(parseMeta(await readBody(res, MAX_BYTES), finalUrl), { headers });
   } catch {
     return NextResponse.json({}, { headers }); // a preview is a nicety; never an error the user has to deal with
   }
