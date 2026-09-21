@@ -7,9 +7,12 @@ import { useState } from "react";
 import { ItemMenu } from "@/components/later/ItemMenu";
 import { ReactionBar } from "@/components/later/ReactionBar";
 import { useItemActions } from "@/components/later/useItemActions";
+import { useAppUI } from "@/components/ui/AppUI";
 import { Avatar, ErrorState, PillButton, Skeleton, SourceChip } from "@/components/ui/bits";
+import { AddPhotoButton } from "@/components/later/AddPhotoButton";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { ItemArt } from "@/components/ui/ItemArt";
-import { CATEGORY_BY_ID } from "@/lib/categories";
+import { CATEGORY_BY_ID, iconFor } from "@/lib/categories";
 import { sourceInfo } from "@/lib/utils";
 import { updateItem } from "@/lib/store";
 import { useShared } from "@/lib/useShared";
@@ -18,7 +21,8 @@ import { countdown, friendlyDay, mapsSearchUrl, timeAgo } from "@/lib/utils";
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { ready, items, profiles, line, foundBy } = useShared();
+  const { ready, items, profiles, line, foundBy, memories } = useShared();
+  const { openMemory } = useAppUI();
   const item = items.find((i) => i.id === id);
   const a = useItemActions();
   const [menu, setMenu] = useState(false);
@@ -51,6 +55,7 @@ export default function ItemDetailPage() {
   const cat = CATEGORY_BY_ID[item.category];
   const by = profiles.find((p) => p.id === item.created_by) ?? profiles[0];
   const talk = line(item);
+  const remembered = memories.filter((x) => x.saved_item_id === item.id);
   // a saved Google Maps link IS the maps link; otherwise search by the place name (no API, no key)
   const mapsHref = sourceInfo(item.source_url)?.label === "Google Maps" ? item.source_url : item.location_name ? mapsSearchUrl(item.location_name) : "";
 
@@ -63,20 +68,30 @@ export default function ItemDetailPage() {
         </PillButton>
       </div>
 
-      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="aspect-[4/3] overflow-hidden rounded-card shadow-soft">
-        <ItemArt item={item} priority emojiClass="text-[120px]" />
-      </motion.div>
+      {item.image_url && (
+        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="aspect-[4/3] overflow-hidden rounded-card shadow-soft">
+          <ItemArt item={item} priority />
+        </motion.div>
+      )}
 
       <div className="px-1">
-        <p className="text-sm font-semibold text-mute">
-          {cat.emoji} {cat.label}
-        </p>
+        {item.image_url ? (
+          <p className="text-sm font-semibold text-mute">
+            {cat.emoji} {cat.label}
+          </p>
+        ) : (
+          <div className="flex items-center gap-3">
+            <CategoryIcon category={iconFor(item)} size="lg" />
+            <span className="text-sm font-semibold text-mute">{cat.label}</span>
+          </div>
+        )}
         <h1 className="mt-1 font-display text-[34px] font-bold leading-[1.05] tracking-tight">{item.title}</h1>
         {item.description && <p className="mt-2 text-[17px] text-ink/70">{item.description}</p>}
         {talk && <p className="mt-3 text-[17px] font-semibold">{talk}</p>}
       </div>
 
       <ReactionBar item={item} />
+      {!item.image_url && <AddPhotoButton itemId={item.id} />}
 
       <section className="divide-y divide-line overflow-hidden rounded-card bg-card shadow-soft">
         {item.location_name && (
@@ -110,6 +125,11 @@ export default function ItemDetailPage() {
             <Avatar profile={by} size={26} /> {foundBy(item).replace("found by ", "")} <span className="font-normal text-mute">· {timeAgo(item.created_at)}</span>
           </span>
         </Row>
+        {remembered.map((x) => (
+          <Row key={x.id} label="memory">
+            <Link href={`/memories/${x.id}`} className="font-medium underline decoration-ink/20 underline-offset-4">📸 {x.title} →</Link>
+          </Row>
+        ))}
         {item.tags.length > 0 && (
           <Row label="tags">
             <span className="flex flex-wrap gap-1.5">
@@ -127,7 +147,7 @@ export default function ItemDetailPage() {
 
       <div className="flex gap-3">
         {item.status === "done" ? (
-          <PillButton size="lg" tone="ghost" className="flex-1" onClick={() => a.changeStatus(item, "saved")}>we haven&apos;t done this</PillButton>
+          <PillButton size="lg" className="flex-1" onClick={() => openMemory({ fromItem: item })}>📸 add a memory</PillButton>
         ) : (
           <PillButton size="lg" className="flex-1" onClick={() => a.changeStatus(item, "done")}>we did it 🎉</PillButton>
         )}

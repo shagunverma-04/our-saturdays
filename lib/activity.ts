@@ -3,7 +3,7 @@
 
 import { itemEmoji } from "./categories.ts";
 import { signalsFor } from "./shared.ts";
-import type { Interaction, Profile, SavedItem } from "./types.ts";
+import type { Interaction, Memory, Profile, SavedItem } from "./types.ts";
 
 export interface FeedEvent {
   id: string;
@@ -27,7 +27,7 @@ function found(item: SavedItem): string {
   }
 }
 
-export function activityFeed(items: SavedItem[], interactions: Interaction[], profiles: Profile[], meId: string, now = new Date(), limit = 40): FeedEvent[] {
+export function activityFeed(items: SavedItem[], interactions: Interaction[], profiles: Profile[], meId: string, now = new Date(), limit = 40, memories: Memory[] = []): FeedEvent[] {
   const name = (id: string) => (id === meId ? "you" : profiles.find((p) => p.id === id)?.name || "they");
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const byId = new Map(items.map((i) => [i.id, i]));
@@ -58,6 +58,10 @@ export function activityFeed(items: SavedItem[], interactions: Interaction[], pr
     const whose = item.created_by === i.user_id ? "their own" : item.created_by === meId ? "your" : `${name(item.created_by)}'s`;
     if (i.type === "like" && item.created_by !== i.user_id) push({ id: `like-${i.id}`, at: i.created_at, icon: "❤️", text: `${cap(name(i.user_id))} liked ${whose} “${item.title}” find`, href });
     if (i.type === "saturday") push({ id: `sat-${i.id}`, at: i.created_at, icon: "📅", text: `${cap(name(i.user_id))} suggested Saturday for “${item.title}”`, href });
+  }
+
+  for (const m of memories) {
+    push({ id: `memory-${m.id}`, at: m.created_at, icon: "📸", text: `${cap(name(m.created_by))} added a memory: “${m.title}”`, href: `/memories/${m.id}` });
   }
 
   return ev.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);

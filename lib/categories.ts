@@ -38,6 +38,11 @@ const TAG_EMOJI: Record<string, string> = {
   dessert: "🍰", brunch: "🥞", music: "🎵", trek: "⛰️",
 };
 
+/** Which hand-drawn icon best fits an item: a coffee spot gets the cup, not the sushi it'd get as "eat". */
+export function iconFor(item: Pick<SavedItem, "category" | "tags">): CategoryId {
+  return item.tags.some((t) => t === "coffee" || t === "cafe") ? "places" : item.category;
+}
+
 export function itemEmoji(item: Pick<SavedItem, "category" | "tags">): string {
   for (const t of item.tags) {
     const e = TAG_EMOJI[t.toLowerCase()];

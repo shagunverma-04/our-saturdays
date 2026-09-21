@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { PillButton, ScreenHeader, SourceChip } from "@/components/ui/bits";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { captureLink, extractUrl } from "@/lib/capture";
+import { linkFromSearch } from "@/lib/shareParams";
 import { updateItem, useStore } from "@/lib/store";
 import type { SavedItem } from "@/lib/types";
 
@@ -32,8 +33,7 @@ export default function SharePage() {
   useEffect(() => {
     if (!ready || done.current) return;
     done.current = true;
-    const q = new URLSearchParams(window.location.search);
-    const url = extractUrl(q.get("url"), q.get("text"), q.get("title"));
+    const url = linkFromSearch(window.location.search);
     // deferred a tick so the save (which touches the store) isn't a synchronous state update inside the effect
     void Promise.resolve().then(() => (url ? saveUrl(url) : setPhase("nolink")));
   }, [ready]);

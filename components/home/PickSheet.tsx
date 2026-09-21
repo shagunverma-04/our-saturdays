@@ -3,18 +3,17 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useAppUI } from "@/components/ui/AppUI";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { ItemArt } from "@/components/ui/ItemArt";
 import { PillButton } from "@/components/ui/bits";
 import { Sheet } from "@/components/ui/Sheet";
-import { itemEmoji } from "@/lib/categories";
+import { iconFor, itemEmoji } from "@/lib/categories";
+import { recentPicks, rememberPick } from "@/lib/pickHistory";
 import { pickPool, weightedPick } from "@/lib/shared";
 import { planItem } from "@/lib/store";
 import type { SavedItem } from "@/lib/types";
 import { useShared } from "@/lib/useShared";
 import { nextSaturday, toISODate } from "@/lib/utils";
-
-// remembered for the session so "not today" never bounces straight back to the same thing
-const recent: string[] = [];
 
 export function PickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
@@ -38,7 +37,7 @@ function Picker({ onClose }: { onClose: () => void }) {
   const spin = () => {
     if (!pool.length) return setPhase("empty");
     setPhase("spinning");
-    const chosen = weightedPick(pool, interactions, meId, recent);
+    const chosen = weightedPick(pool, interactions, meId, recentPicks());
     let n = 0;
     clearInterval(timer.current);
     timer.current = setInterval(() => {
@@ -46,8 +45,7 @@ function Picker({ onClose }: { onClose: () => void }) {
       if (n > 11) {
         clearInterval(timer.current);
         if (!chosen) return setPhase("empty");
-        recent.push(chosen.id);
-        if (recent.length > 6) recent.shift();
+        rememberPick(chosen.id);
         setPick(chosen);
         setSharedPool(shared);
         setPhase("result");
@@ -88,9 +86,15 @@ function Picker({ onClose }: { onClose: () => void }) {
           pick && (
             <motion.div key={pick.id} initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 340, damping: 24 }}>
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-mute">{isSaturday ? "tonight's pick 👀" : "saturday's pick 👀"}</p>
-              <div className="mt-3 aspect-[16/10] overflow-hidden rounded-[28px] shadow-soft">
-                <ItemArt item={pick} priority emojiClass="text-8xl" />
-              </div>
+              {pick.image_url ? (
+                <div className="mt-3 aspect-[16/10] overflow-hidden rounded-[28px] shadow-soft">
+                  <ItemArt item={pick} priority />
+                </div>
+              ) : (
+                <div className="mt-3 flex justify-center py-3">
+                  <CategoryIcon category={iconFor(pick)} size="lg" className="scale-[1.5]" />
+                </div>
+              )}
               <h2 className="mt-4 font-display text-[30px] font-bold leading-tight tracking-tight">{pick.title}</h2>
               <p className="text-[15px] text-mute">{pick.description || pick.location_name || pick.category}</p>
               {!sharedPool && <p className="mt-2 text-sm text-mute">nothing you both like yet, so this is just a fun find. ❤️ things to fix that.</p>}

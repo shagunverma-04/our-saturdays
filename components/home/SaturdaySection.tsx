@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
+import { Icon3D } from "@/components/ui/Icon3D";
 import { ItemArt } from "@/components/ui/ItemArt";
 import { MapBackdrop } from "@/components/ui/MapBackdrop";
 import { PillButton } from "@/components/ui/bits";
 import { useAppUI } from "@/components/ui/AppUI";
-import { itemEmoji } from "@/lib/categories";
+import { iconFor, itemEmoji } from "@/lib/categories";
 import { saturdayCandidates } from "@/lib/shared";
 import { planItem, setStatus } from "@/lib/store";
 import { useShared } from "@/lib/useShared";
@@ -45,13 +46,15 @@ export function SaturdaySection() {
 
   return (
     <section aria-label="saturday" className="relative overflow-hidden rounded-[36px] shadow-float">
-      {planned && plan ? <ItemArt item={planned} priority emojiClass="mb-[200px] text-[84px]" className="absolute inset-0" /> : <MapBackdrop />}
+      {planned?.image_url ? <ItemArt item={planned} priority className="absolute inset-0" /> : <MapBackdrop />}
 
       <div className={planned ? "flex min-h-[380px] flex-col justify-end" : "flex min-h-[360px] flex-col justify-end"}>
-        {!planned && (
+        {!planned?.image_url && (
           <div className="pointer-events-none absolute inset-x-0 top-6 flex justify-center" aria-hidden>
             <div className="floaty flex flex-col items-center">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-ink text-2xl text-on-ink shadow-float">👀</span>
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-ink text-2xl text-on-ink shadow-float">
+                {planned ? <Icon3D category={iconFor(planned)} className="h-9 w-9" /> : "👀"}
+              </span>
               <span className="-mt-1 h-2.5 w-2.5 rotate-45 rounded-[2px] bg-ink" />
             </div>
           </div>

@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test:db": "bash supabase/tests/run.sh",
     "test:remote": "bash supabase/tests/run-remote.sh",
-    "test:logic": "node --test tests/logic.test.ts tests/preview.test.ts"
+    "test:logic": "node --test tests/logic.test.ts tests/preview.test.ts tests/shareParams.test.ts tests/memories.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

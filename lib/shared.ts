@@ -113,7 +113,7 @@ export function pickPool(items: SavedItem[], interactions: Interaction[], meId: 
 }
 
 /** Weighted random pick that avoids what was just shown. `rand` is injectable for tests. */
-export function weightedPick(pool: SavedItem[], interactions: Interaction[], meId: string, avoid: string[], rand = Math.random, now = new Date()): SavedItem | null {
+export function weightedPick(pool: SavedItem[], interactions: Interaction[], meId: string, avoid: readonly string[], rand = Math.random, now = new Date()): SavedItem | null {
   const candidates = pool.filter((i) => !avoid.includes(i.id));
   const list = candidates.length ? candidates : pool.filter((i) => i.id !== avoid[avoid.length - 1]);
   if (!list.length) return pool[0] ?? null;

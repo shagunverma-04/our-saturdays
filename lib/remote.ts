@@ -2,7 +2,7 @@
 // so the store stays simple and these exact queries are integration-tested (supabase/tests/remote.test.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Interaction, InteractionType, Plan, Profile, SavedItem } from "./types";
+import type { Interaction, InteractionType, Memory, Plan, Profile, SavedItem } from "./types";
 
 type Row = Record<string, unknown>;
 interface Result {
@@ -64,6 +64,21 @@ export function rowToInteraction(r: Row): Interaction {
   return { id: r.id as string, saved_item_id: r.saved_item_id as string, user_id: r.user_id as string, type: r.interaction_type as InteractionType, created_at: r.created_at as string };
 }
 
+export function rowToMemory(r: Row): Memory {
+  const photos = ((r.memory_photos as Array<{ storage_path: string; display_order: number }> | null) ?? []).slice().sort((a, b) => a.display_order - b.display_order).map((p) => p.storage_path);
+  return {
+    id: r.id as string,
+    created_by: r.created_by as string,
+    title: (r.title as string) ?? "",
+    description: (r.description as string) ?? "",
+    date: r.date as string,
+    location: (r.location as string) ?? "",
+    saved_item_id: (r.saved_item_id as string | null) ?? null,
+    photos,
+    created_at: r.created_at as string,
+  };
+}
+
 export function profilePatchToRow(p: Partial<Profile>): Row {
   const row: Row = {};
   if (p.name !== undefined) row.name = p.name;
@@ -74,14 +89,16 @@ export function profilePatchToRow(p: Partial<Profile>): Row {
 
 // ---- reads -----------------------------------------------------------------
 
-export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem[]; plans: Plan[]; profiles: Profile[]; interactions: Interaction[]; interactionsReady: boolean }> {
+export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem[]; plans: Plan[]; profiles: Profile[]; interactions: Interaction[]; interactionsReady: boolean; memories: Memory[] }> {
   // RLS scopes every one of these to the caller's couple, so no couple_id filter is needed (or trusted).
-  const [items, plans, profiles, inter] = await Promise.all([
+  const [items, plans, profiles, inter, mems] = await Promise.all([
     ok(sb.from("saved_items").select("*").order("created_at", { ascending: false }).limit(1000)),
     ok(sb.from("plans").select("*")),
     ok(sb.from("profiles").select("id, name, avatar_emoji, avatar_url")),
     // tolerated separately: if migration 003 hasn't been run yet the app still works, just without reactions
     sb.from("item_interactions").select("id, saved_item_id, user_id, interaction_type, created_at").limit(5000),
+    // tolerated separately, like reactions: the journal is optional until its migration has been run
+    sb.from("memories").select("*, memory_photos(storage_path, display_order)").order("date", { ascending: false }).limit(1000),
   ]);
   return {
     items: (items.data as Row[]).map(rowToItem),
@@ -89,6 +106,7 @@ export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem
     profiles: (profiles.data as Row[]).map(rowToProfile),
     interactions: inter.error ? [] : ((inter.data ?? []) as Row[]).map(rowToInteraction),
     interactionsReady: !inter.error,
+    memories: mems.error ? [] : ((mems.data ?? []) as Row[]).map(rowToMemory),
   };
 }
 
@@ -147,6 +165,35 @@ export async function insertInteraction(sb: SupabaseClient, coupleId: string, i:
 
 export async function deleteInteraction(sb: SupabaseClient, itemId: string, userId: string, type: InteractionType) {
   await ok(sb.from("item_interactions").delete().eq("saved_item_id", itemId).eq("user_id", userId).eq("interaction_type", type));
+}
+
+// ---- memories ----------------------------------------------------------------
+
+export async function insertMemory(sb: SupabaseClient, coupleId: string, m: Memory) {
+  const row: Row = { id: m.id, couple_id: coupleId, created_by: m.created_by, title: m.title, description: m.description, date: m.date, location: m.location };
+  if (m.saved_item_id) row.saved_item_id = m.saved_item_id; // only when set, so this still works before the column exists
+  await ok(sb.from("memories").insert(row));
+  if (m.photos.length) await ok(sb.from("memory_photos").insert(m.photos.map((storage_path, display_order) => ({ memory_id: m.id, storage_path, display_order }))));
+}
+
+/** Update a memory's words and reconcile its photo set (remove / add / reorder) against what the server has. */
+export async function patchMemory(sb: SupabaseClient, id: string, patch: Partial<Memory>, before: string[]) {
+  const { photos, ...rest } = patch;
+  const fields: Row = { ...rest };
+  for (const k of ["id", "created_by", "created_at"]) delete fields[k];
+  if (Object.keys(fields).length) await ok(sb.from("memories").update(fields).eq("id", id));
+  if (!photos) return;
+  const removed = before.filter((p) => !photos.includes(p));
+  if (removed.length) await ok(sb.from("memory_photos").delete().eq("memory_id", id).in("storage_path", removed));
+  const added = photos.map((storage_path, display_order) => ({ memory_id: id, storage_path, display_order })).filter((p) => !before.includes(p.storage_path));
+  if (added.length) await ok(sb.from("memory_photos").insert(added));
+  for (const [display_order, storage_path] of photos.entries()) {
+    if (before.includes(storage_path) && before.indexOf(storage_path) !== display_order) await ok(sb.from("memory_photos").update({ display_order }).eq("memory_id", id).eq("storage_path", storage_path));
+  }
+}
+
+export async function deleteMemory(sb: SupabaseClient, id: string) {
+  await ok(sb.from("memories").delete().eq("id", id)); // photo rows go with it (cascade)
 }
 
 // ---- couples (RPC — members can't insert into couples directly) ------------

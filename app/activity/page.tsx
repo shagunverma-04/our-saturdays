@@ -8,8 +8,8 @@ import { activityFeed } from "@/lib/activity";
 import { useShared } from "@/lib/useShared";
 
 export default function ActivityPage() {
-  const { ready, items, interactions, profiles, meId } = useShared();
-  const feed = useMemo(() => activityFeed(items, interactions, profiles, meId, new Date(), 60), [items, interactions, profiles, meId]);
+  const { ready, items, interactions, profiles, meId, memories } = useShared();
+  const feed = useMemo(() => activityFeed(items, interactions, profiles, meId, new Date(), 60, memories), [items, interactions, profiles, meId, memories]);
 
   return (
     <main className="mx-auto max-w-[560px]">

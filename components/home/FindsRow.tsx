@@ -2,8 +2,9 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { ItemArt } from "@/components/ui/ItemArt";
-import { CATEGORY_BY_ID } from "@/lib/categories";
+import { CATEGORY_BY_ID, iconFor } from "@/lib/categories";
 import { toggleInteraction } from "@/lib/store";
 import type { SavedItem } from "@/lib/types";
 import { useShared } from "@/lib/useShared";
@@ -26,11 +27,18 @@ export function FindsRow({ title, items }: { title: string; items: SavedItem[] }
           const liked = s.mine.has("like");
           const theirLike = s.theirs.has("like");
           return (
-            <motion.div key={i.id} whileTap={{ scale: 0.97 }} className="relative w-[172px] shrink-0 snap-start">
+            <motion.div key={i.id} whileTap={{ scale: 0.97 }} className="relative w-[172px] shrink-0 snap-start self-start">
               <Link href={`/later/${i.id}`} className="block overflow-hidden rounded-[28px] bg-card shadow-soft">
-                <div className="aspect-[4/5] w-full">
-                  <ItemArt item={i} emojiClass="text-6xl" />
-                </div>
+                {i.image_url ? (
+                  <div className="aspect-[4/5] w-full">
+                    <ItemArt item={i} />
+                  </div>
+                ) : (
+                  // no photo: no empty picture, just the little object
+                  <div className="flex h-[92px] items-end px-4 pt-4">
+                    <CategoryIcon category={iconFor(i)} size="lg" />
+                  </div>
+                )}
                 <div className="p-3.5">
                   <p className="line-clamp-2 font-display text-[17px] font-semibold leading-tight tracking-tight">{i.title}</p>
                   <p className="mt-1 truncate text-xs text-mute">

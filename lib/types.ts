@@ -51,3 +51,18 @@ export interface Interaction {
   type: InteractionType;
   created_at: string;
 }
+
+/** A moment worth keeping: photos plus a few words. Never liked, never commented on — just ours. */
+export interface Memory {
+  id: string;
+  created_by: string;
+  title: string;
+  description: string;
+  date: string; // YYYY-MM-DD — when it happened, not when it was saved
+  location: string;
+  saved_item_id: string | null; // the find this came from, if any ("it becomes a memory")
+  photos: string[]; // ordered photo references (see lib/media.ts)
+  created_at: string;
+}
+
+export type NewMemoryInput = Pick<Memory, "title"> & Partial<Omit<Memory, "id" | "created_by" | "created_at" | "title">>;

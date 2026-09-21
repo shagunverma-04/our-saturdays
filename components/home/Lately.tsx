@@ -9,16 +9,16 @@ import { FeedList } from "./FeedList";
 
 /** "lately": one true sentence about your week, a couple of honest observations, and the last few moments. */
 export function Lately() {
-  const { items, interactions, profiles, meId, sig } = useShared();
+  const { items, interactions, profiles, meId, sig, memories } = useShared();
 
   const { line, notes, feed } = useMemo(() => {
     const mutual = items.filter((i) => sig(i).mutual && i.status !== "done" && i.status !== "archived");
     return {
       line: lately(items),
       notes: insights(items, mutual),
-      feed: activityFeed(items, interactions, profiles, meId, new Date(), 3),
+      feed: activityFeed(items, interactions, profiles, meId, new Date(), 3, memories),
     };
-  }, [items, interactions, profiles, meId, sig]);
+  }, [items, interactions, profiles, meId, sig, memories]);
 
   if (!line && notes.length === 0 && feed.length === 0) return null;
 

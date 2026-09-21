@@ -147,5 +147,41 @@ select pg_temp.expect_count($$select 1 from public.item_interactions$$, 1);
 select pg_temp.as_admin();
 select pg_temp.expect_count($$select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'item_interactions'$$, 1);
 
+-- ── 004: memories ────────────────────────────────────────────────────────────
+select pg_temp.as_admin();
+select id as ramen_id2 from public.saved_items where title = 'Ramen' \gset
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+insert into public.memories (couple_id, title, description, date, location, saved_item_id) values (:'a_couple', 'Ramen night', 'so good', '2026-09-12', 'Koramangala', :'ramen_id2');
+select id as mem_id from public.memories where title = 'Ramen night' \gset
+insert into public.memory_photos (memory_id, storage_path, display_order) values (:'mem_id', 'sb:x/1.jpg', 0), (:'mem_id', 'sb:x/2.jpg', 1);
+select pg_temp.expect_error(format($$insert into public.memory_photos (memory_id, storage_path, display_order) values (%L, 'sb:x/1.jpg', 5)$$, :'mem_id'), 'duplicate key');
+select pg_temp.expect_error(format($$insert into public.memories (couple_id, title, created_by) values (%L, 'spoof', '00000000-0000-0000-0000-00000000000b')$$, :'a_couple'), 'row-level security');
+-- partner sees it, can edit the caption and add a photo, but not change who made it
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_count($$select 1 from public.memories$$, 1);
+select pg_temp.expect_count($$select 1 from public.memory_photos$$, 2);
+update public.memories set description = 'best broth ever' where id = :'mem_id';
+insert into public.memory_photos (memory_id, storage_path, display_order) values (:'mem_id', 'sb:x/3.jpg', 2);
+select pg_temp.expect_error(format($$update public.memories set created_by = auth.uid() where id = %L$$, :'mem_id'), 'created_by cannot be changed');
+-- outsider: sees nothing; can't add photos to it, edit it, or link it to her own item
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_count($$select 1 from public.memories$$, 0);
+select pg_temp.expect_count($$select 1 from public.memory_photos$$, 0);
+select pg_temp.expect_error(format($$insert into public.memory_photos (memory_id, storage_path, display_order) values (%L, 'sb:evil.jpg', 0)$$, :'mem_id'), 'row-level security');
+update public.memories set title = 'HACKED';
+delete from public.memories;
+select pg_temp.as_admin();
+select pg_temp.expect_count($$select 1 from public.memories where title = 'Ramen night' and description = 'best broth ever'$$, 1);
+-- can't point a memory at another couple's item (carol's own couple + alice's item)
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_count($$select 1 from public.couples$$, 1);   -- precondition: she can see exactly her own couple, so the insert below really attempts a row
+select pg_temp.expect_error(format($$insert into public.memories (couple_id, title, saved_item_id) select id, 'x', %L from public.couples$$, :'ramen_id2'), 'row-level security');
+-- deleting a memory takes its photo rows; deleting the item only unlinks
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+delete from public.memories where id = :'mem_id';
+select pg_temp.expect_count($$select 1 from public.memory_photos$$, 0);
+select pg_temp.as_admin();
+select pg_temp.expect_count($$select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename in ('memories','memory_photos')$$, 2);
+
 -- 002 is idempotent (re-run safe) — checked by the runner script.
 select 'ALL RLS TESTS PASSED' as result;

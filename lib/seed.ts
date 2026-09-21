@@ -1,4 +1,4 @@
-import type { CategoryId, Interaction, InteractionType, Plan, Profile, SavedItem, Status } from "./types";
+import type { CategoryId, Interaction, InteractionType, Memory, Plan, Profile, SavedItem, Status } from "./types";
 import { toISODate } from "./utils";
 
 export const DEFAULT_PROFILES: Profile[] = [
@@ -57,7 +57,7 @@ const REACTIONS: Array<[string, "u1" | "u2", InteractionType, number]> = [
   ["salsa", "u1", "interested", 2],
 ];
 
-export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]; interactions: Interaction[] } {
+export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]; interactions: Interaction[]; memories: Memory[] } {
   const items: SavedItem[] = SEEDS.map((s) => {
     const created = new Date(now.getTime() - s.ago * DAY).toISOString();
     return {
@@ -84,5 +84,22 @@ export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]
     type,
     created_at: new Date(now.getTime() - ago * DAY).toISOString(),
   }));
-  return { items, plans: [], interactions };
+  // a few moments so the journal isn't empty in demo mode (no photos: they show as little illustrations)
+  const mem = (key: string, by: "u1" | "u2", ago: number, title: string, description: string, location: string, itemKey?: string): Memory => ({
+    id: `seed-mem-${key}`,
+    created_by: by,
+    title,
+    description,
+    date: toISODate(new Date(now.getTime() - ago * DAY)),
+    location,
+    saved_item_id: itemKey ? `seed-${itemKey}` : null,
+    photos: [],
+    created_at: new Date(now.getTime() - ago * DAY).toISOString(),
+  });
+  const memories: Memory[] = [
+    mem("coffee", "u1", 4, "that random tuesday", "we went out for coffee and somehow ended up walking for 3 hours.", "Indiranagar"),
+    mem("picnic", "u2", 40, "the blanket picnic", "forgot the corkscrew. ate all the cheese anyway.", "Cubbon Park", "picnic"),
+    mem("coorg", "u1", 120, "coorg, in the rain", "coffee estates, board games, zero regrets.", "Coorg", "coorg"),
+  ];
+  return { items, plans: [], interactions, memories };
 }

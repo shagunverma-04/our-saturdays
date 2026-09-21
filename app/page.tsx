@@ -5,7 +5,9 @@ import { useMemo } from "react";
 import { FindsRow } from "@/components/home/FindsRow";
 import { Lately } from "@/components/home/Lately";
 import { LittleMoment } from "@/components/home/LittleMoment";
+import { MemoryPeek } from "@/components/home/MemoryPeek";
 import { PasteLink } from "@/components/home/PasteLink";
+import { PickForUs } from "@/components/home/PickForUs";
 import { SaturdaySection } from "@/components/home/SaturdaySection";
 import { Avatar, EmptyState, PillButton, Skeleton } from "@/components/ui/bits";
 import { useAppUI } from "@/components/ui/AppUI";
@@ -58,6 +60,8 @@ export default function HomePage() {
             <FindsRow title={partner ? `from ${partner.name}` : "from them"} items={fromThem} />
           </div>
           <div className="space-y-8 lg:order-2">
+            <MemoryPeek />
+            <PickForUs />
             <Lately />
             <LittleMoment />
           </div>

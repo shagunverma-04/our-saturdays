@@ -32,7 +32,7 @@ export function AddSheet({ open, onClose, category, edit }: Props) {
 const inputCls = "h-14 w-full rounded-[20px] bg-card px-4 text-ink shadow-soft placeholder:text-mute/80 outline-none focus:ring-2 focus:ring-ink/20";
 
 function AddForm({ onClose, category, edit }: Omit<Props, "open">) {
-  const { toast } = useAppUI();
+  const { toast, openMemory } = useAppUI();
   // an unsent draft survives a dropped connection, an accidental swipe-down, or a tab reload (this session only)
   const [draft] = useState(() => (edit ? {} : readDraft()));
   const [cat, setCat] = useState<CategoryId>(edit?.category ?? category ?? "places");
@@ -160,7 +160,16 @@ function AddForm({ onClose, category, edit }: Omit<Props, "open">) {
         {CATEGORIES.map((c) => (
           <CategoryTile key={c.id} category={c.id} label={c.addLabel} selected={cat === c.id} onSelect={() => setCat(c.id)} />
         ))}
-        <CategoryTile category="ideas" emoji="📸" label="Memory" hint="soon" selected={false} disabled onSelect={() => {}} />
+        <CategoryTile
+          category="ideas"
+          emoji="📸"
+          label="Memory"
+          selected={false}
+          onSelect={() => {
+            onClose();
+            openMemory();
+          }}
+        />
       </div>
 
       <div className="mt-4 space-y-3">

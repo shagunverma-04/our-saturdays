@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ShareCode } from "@/components/auth/ShareCode";
 import { useAppUI } from "@/components/ui/AppUI";
 import { Avatar, Chip, PillButton, ScreenHeader, Skeleton } from "@/components/ui/bits";
@@ -15,7 +15,7 @@ const count = (items: SavedItem[], pred: (i: SavedItem) => boolean) => items.fil
 const EMOJIS = ["🧢", "🌿", "🦊", "🐻", "🌻", "🍄", "🐙", "🌙", "🍒", "🎧", "🪴", "🐸"];
 
 export default function UsPage() {
-  const { ready, items, profiles, meId } = useStore();
+  const { ready, items, profiles, meId, memories } = useStore();
   const session = useSession();
   const theme = useTheme();
   const [confirmReset, setConfirmReset] = useState(false);
@@ -35,6 +35,8 @@ export default function UsPage() {
     { emoji: "🎬", n: count(items, (i) => i.category === "watch"), label: "movies watched" },
     { emoji: "🎨", n: count(items, (i) => i.category === "do"), label: "things tried" },
     { emoji: "✈️", n: count(items, (i) => i.category === "travel"), label: "trips taken" },
+    { emoji: "📸", n: memories.length, label: "memories kept" },
+    { emoji: "🖼️", n: memories.reduce((sum, m) => sum + m.photos.length, 0), label: "photos kept" },
     { emoji: "📌", n: items.filter((i) => i.status === "saved" || i.status === "planned" || i.status === "maybe").length, label: "still on our list" },
   ];
 
@@ -67,8 +69,6 @@ export default function UsPage() {
         </div>
         <p className="mt-2 px-1 text-sm text-mute">a taste of &quot;who saved this?&quot; already lives on home.</p>
       </section>
-
-      <SaveFromAnywhere />
 
       <section aria-labelledby="look-h" className="mt-8">
         <h2 id="look-h" className="px-1 font-display text-2xl font-bold tracking-tight">look</h2>
@@ -130,38 +130,6 @@ export default function UsPage() {
         )}
       </section>
     </main>
-  );
-}
-
-function SaveFromAnywhere() {
-  const [origin, setOrigin] = useState("https://your-site");
-  useEffect(() => {
-    // deferred: reading window during render would break hydration
-    const t = setTimeout(() => setOrigin(window.location.origin), 0);
-    return () => clearTimeout(t);
-  }, []);
-  const step = "mt-2 flex gap-3 text-[15px] text-ink/80";
-  const n = "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-on-ink";
-  return (
-    <section aria-labelledby="capture-h" className="mt-8 rounded-[28px] bg-card p-5 shadow-soft">
-      <h2 id="capture-h" className="font-display text-xl font-bold tracking-tight">save from anywhere</h2>
-      <p className="mt-1 text-[15px] text-mute">see a reel, a place, a trailer → share it here. no form, it just lands on both phones.</p>
-      <details className="mt-4 rounded-2xl bg-ink/[0.05] p-4">
-        <summary className="cursor-pointer text-[15px] font-semibold">📱 iPhone (a one-time shortcut)</summary>
-        <ol className="mt-2">
-          <li className={step}><span className={n}>1</span>open the <b>Shortcuts</b> app → tap <b>+</b> → name it &ldquo;our saturdays&rdquo;.</li>
-          <li className={step}><span className={n}>2</span>tap ⓘ → turn on <b>Show in Share Sheet</b> → set accepted types to <b>URLs</b> only.</li>
-          <li className={step}><span className={n}>3</span>add the <b>Text</b> action and type <code className="break-all rounded bg-ink/10 px-1">{origin}/share?url=</code> then tap the variable and pick <b>Shortcut Input</b>.</li>
-          <li className={step}><span className={n}>4</span>add <b>Open URLs</b> and feed it that text. done.</li>
-          <li className={step}><span className={n}>5</span>now in Instagram / YouTube / Maps: <b>Share → our saturdays</b>.</li>
-        </ol>
-        <p className="mt-3 text-sm text-mute">it opens in Safari, so stay signed in there too. no shortcut? Share → Copy link → open the app → tap <b>paste a link</b> on home.</p>
-      </details>
-      <details className="mt-3 rounded-2xl bg-ink/[0.05] p-4">
-        <summary className="cursor-pointer text-[15px] font-semibold">🤖 Android</summary>
-        <p className="mt-2 text-[15px] text-ink/80">install the app (Chrome → ⋮ → Install app). after that, <b>our saturdays</b> shows up in every Share menu.</p>
-      </details>
-    </section>
   );
 }
 

@@ -12,7 +12,7 @@ import { deletePhoto, isStoredRef } from "./media";
 import * as remoteIO from "./remote";
 import { buildSeed, DEFAULT_PROFILES } from "./seed";
 import { getSupabase, isSupabaseConfigured as shared } from "./supabase/client";
-import type { Interaction, InteractionType, NewItemInput, Plan, Profile, SavedItem, Status } from "./types";
+import type { Interaction, InteractionType, Memory, NewItemInput, NewMemoryInput, Plan, Profile, SavedItem, Status } from "./types";
 import { nextSaturday, toISODate } from "./utils";
 
 const KEY = "our-saturdays:v1";
@@ -25,13 +25,14 @@ export interface StoreState {
   profiles: Profile[];
   meId: string;
   interactions: Interaction[];
+  memories: Memory[];
   /** false when the database doesn't have item_interactions yet (migration 003 not run) */
   interactionsReady: boolean;
   /** a small, non-blocking message (e.g. "couldn't save that — retry") */
   notice: { id: number; message: string; retry?: () => void } | null;
 }
 
-const LOADING: StoreState = { ready: false, error: null, items: [], plans: [], profiles: shared ? [] : DEFAULT_PROFILES, meId: "u1", interactions: [], interactionsReady: true, notice: null };
+const LOADING: StoreState = { ready: false, error: null, items: [], plans: [], profiles: shared ? [] : DEFAULT_PROFILES, meId: "u1", interactions: [], memories: [], interactionsReady: true, notice: null };
 
 let state: StoreState | null = null;
 const listeners = new Set<() => void>();
@@ -40,8 +41,8 @@ const notify = () => listeners.forEach((l) => l());
 // ---- demo (local) persistence ----------------------------------------------
 
 function seeded(error: string | null = null): StoreState {
-  const { items, plans, interactions } = buildSeed();
-  return { ready: true, error, items, plans, profiles: DEFAULT_PROFILES, meId: "u1", interactions, interactionsReady: true, notice: null };
+  const { items, plans, interactions, memories } = buildSeed();
+  return { ready: true, error, items, plans, profiles: DEFAULT_PROFILES, meId: "u1", interactions, memories, interactionsReady: true, notice: null };
 }
 
 function loadLocal(): StoreState {
@@ -51,7 +52,7 @@ function loadLocal(): StoreState {
     const parsed = JSON.parse(raw) as Partial<StoreState>;
     if (!Array.isArray(parsed.items) || !Array.isArray(parsed.plans)) throw new Error("bad shape");
     const profiles = parsed.profiles?.length === 2 ? parsed.profiles.map((p, i) => ({ ...DEFAULT_PROFILES[i], ...p })) : DEFAULT_PROFILES;
-    return { ready: true, error: null, items: parsed.items, plans: parsed.plans, profiles, meId: parsed.meId ?? "u1", interactions: parsed.interactions ?? buildSeed().interactions, interactionsReady: true, notice: null };
+    return { ready: true, error: null, items: parsed.items, plans: parsed.plans, profiles, meId: parsed.meId ?? "u1", interactions: parsed.interactions ?? buildSeed().interactions, memories: parsed.memories ?? buildSeed().memories, interactionsReady: true, notice: null };
   } catch {
     // corrupted or blocked storage: fall back to demo data instead of a blank app
     return seeded("we couldn't read your saved stuff, so here's the demo set");
@@ -62,8 +63,8 @@ function commit(next: StoreState) {
   state = next;
   if (!shared) {
     try {
-      const { items, plans, profiles, meId, interactions } = next;
-      localStorage.setItem(KEY, JSON.stringify({ items, plans, profiles, meId, interactions }));
+      const { items, plans, profiles, meId, interactions, memories } = next;
+      localStorage.setItem(KEY, JSON.stringify({ items, plans, profiles, meId, interactions, memories }));
     } catch {
       // storage full/blocked — keep working in memory
     }
@@ -158,6 +159,8 @@ export async function bootRemote(userId: string, coupleId: string) {
     .on("postgres_changes", { event: "*", schema: "public", table: "saved_items" }, (p) => relevant(p) && scheduleRefresh())
     .on("postgres_changes", { event: "*", schema: "public", table: "plans" }, (p) => relevant(p) && scheduleRefresh())
     .on("postgres_changes", { event: "*", schema: "public", table: "item_interactions" }, (p) => relevant(p) && scheduleRefresh())
+    .on("postgres_changes", { event: "*", schema: "public", table: "memories" }, (p) => relevant(p) && scheduleRefresh())
+    .on("postgres_changes", { event: "*", schema: "public", table: "memory_photos" }, () => scheduleRefresh())
     .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => scheduleRefresh())
     .subscribe();
   // phones suspend websockets in the background; catching up on return is what makes it feel live
@@ -294,6 +297,59 @@ const normUrl = (u: string) => u.trim().replace(/#.*$/, "").replace(/[?&](utm_[a
 export function findItemByUrl(url: string): SavedItem | undefined {
   const n = normUrl(url);
   return getSnapshot().items.find((i) => i.source_url && normUrl(i.source_url) === n);
+}
+
+// ---- memories ----------------------------------------------------------------
+
+export function getMemoryNow(id: string): Memory | undefined {
+  return getSnapshot().memories.find((m) => m.id === id);
+}
+
+export function addMemory(input: NewMemoryInput): Memory {
+  const s = getSnapshot();
+  const memory: Memory = {
+    description: "",
+    date: toISODate(new Date()),
+    location: "",
+    saved_item_id: null,
+    photos: [],
+    ...input,
+    id: uid(),
+    created_by: s.meId,
+    created_at: new Date().toISOString(),
+  };
+  if (!usable()) return memory;
+  commit({ ...s, memories: [memory, ...s.memories] });
+  if (ctx) void send((sb) => remoteIO.insertMemory(sb, ctx!.coupleId, memory));
+  return memory;
+}
+
+export function updateMemory(id: string, patch: Partial<Memory>) {
+  if (!usable()) return;
+  const s = getSnapshot();
+  const old = s.memories.find((m) => m.id === id);
+  if (!old) return;
+  commit({ ...s, memories: s.memories.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
+  if (ctx) {
+    const dropped = patch.photos ? old.photos.filter((p) => !patch.photos!.includes(p) && isStoredRef(p)) : [];
+    void send(async (sb) => {
+      await remoteIO.patchMemory(sb, id, patch, old.photos);
+      for (const p of dropped) await deletePhoto(p).catch(() => {});
+    });
+  }
+}
+
+export function removeMemory(id: string) {
+  if (!usable()) return;
+  const s = getSnapshot();
+  const old = s.memories.find((m) => m.id === id);
+  commit({ ...s, memories: s.memories.filter((m) => m.id !== id) });
+  if (ctx) {
+    void send(async (sb) => {
+      await remoteIO.deleteMemory(sb, id);
+      for (const p of old?.photos ?? []) if (isStoredRef(p)) await deletePhoto(p).catch(() => {});
+    });
+  }
 }
 
 // ---- reactions ---------------------------------------------------------------

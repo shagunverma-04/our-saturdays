@@ -128,6 +128,44 @@ await step("reactions: deleting an item takes its reactions with it", async () =
   await r.deleteItem(alice, tmp.id);
   assert.equal((await r.fetchSpace(alice)).interactions.some((i) => i.saved_item_id === tmp.id), false);
 });
+const mem = (o: Partial<import("../../lib/types.ts").Memory> = {}) => ({ id: crypto.randomUUID(), created_by: ID.alice, title: "that random tuesday", description: "coffee, then a 3 hour walk", date: "2026-09-17", location: "Indiranagar", saved_item_id: null as string | null, photos: ["sb:c/a.jpg", "sb:c/b.jpg"], created_at: new Date().toISOString(), ...o });
+const memo = mem({ saved_item_id: ramen.id });
+await step("memories: alice saves one with photos, linked to a find; bob reads it with photos in order", async () => {
+  await r.insertMemory(alice, coupleId, memo);
+  const got = (await r.fetchSpace(bob)).memories.find((m) => m.id === memo.id)!;
+  assert.ok(got); assert.deepEqual(got.photos, ["sb:c/a.jpg", "sb:c/b.jpg"]); assert.equal(got.date, "2026-09-17"); assert.equal(got.saved_item_id, ramen.id); assert.equal(got.created_by, ID.alice);
+});
+await step("memories: partner edits words, removes one photo, adds another, and reorders", async () => {
+  await r.patchMemory(bob, memo.id, { description: "best broth ever", photos: ["sb:c/c.jpg", "sb:c/b.jpg"] }, memo.photos);
+  const got = (await r.fetchSpace(alice)).memories.find((m) => m.id === memo.id)!;
+  assert.equal(got.description, "best broth ever"); assert.deepEqual(got.photos, ["sb:c/c.jpg", "sb:c/b.jpg"]); assert.equal(got.created_by, ID.alice);
+  await r.patchMemory(alice, memo.id, { photos: ["sb:c/b.jpg", "sb:c/c.jpg"] }, got.photos);   // swap order only
+  assert.deepEqual((await r.fetchSpace(bob)).memories.find((m) => m.id === memo.id)!.photos, ["sb:c/b.jpg", "sb:c/c.jpg"]);
+});
+await step("memories: no photos is fine; newest memory date sorts first", async () => {
+  const later = mem({ title: "later one", date: "2026-09-20", photos: [] });
+  await r.insertMemory(bob, coupleId, { ...later, created_by: ID.bob });
+  const list = (await r.fetchSpace(alice)).memories;
+  assert.equal(list[0].id, later.id); assert.deepEqual(list[0].photos, []);
+});
+await step("memories: outsider sees none, can't edit, delete, or link to our find", async () => {
+  assert.equal((await r.fetchSpace(carol)).memories.length, 0);
+  await r.patchMemory(carol, memo.id, { title: "HACKED" }, []);
+  await r.deleteMemory(carol, memo.id);
+  assert.equal((await r.fetchSpace(alice)).memories.find((m) => m.id === memo.id)!.title, "that random tuesday");
+  const c = (await r.fetchMyCouple(carol, ID.carol))!;
+  await assert.rejects(r.insertMemory(carol, c.id, mem({ created_by: ID.carol, saved_item_id: ramen.id, photos: [] })), /row-level security/);
+});
+await step("memories: deleting removes its photos; deleting the find only unlinks", async () => {
+  const other = item({ title: "linked" });
+  await r.insertItem(alice, coupleId, other);
+  const m2 = mem({ saved_item_id: other.id, photos: ["sb:c/z.jpg"] });
+  await r.insertMemory(alice, coupleId, m2);
+  await r.deleteItem(alice, other.id);
+  assert.equal((await r.fetchSpace(alice)).memories.find((m) => m.id === m2.id)!.saved_item_id, null);
+  await r.deleteMemory(bob, m2.id);
+  assert.equal((await r.fetchSpace(alice)).memories.some((m) => m.id === m2.id), false);
+});
 await step("delete removes the item and its plans", async () => {
   await r.writePlan(alice, coupleId, { id: crypto.randomUUID(), title: "Ramen", date, category: "eat", saved_item_id: ramen.id, created_at: "" }, []);
   await r.deleteItem(bob, ramen.id);
