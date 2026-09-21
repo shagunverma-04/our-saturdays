@@ -97,6 +97,7 @@ export function sourceInfo(url: string): SourceInfo | null {
     const host = u.hostname.replace(/^www\./, "");
     const path = u.pathname;
     if (host.endsWith("instagram.com")) return { label: "Instagram", host, dot: "#E1306C" };
+    if (host.endsWith("tiktok.com")) return { label: "TikTok", host, dot: "#25F4EE" };
     if (host.endsWith("youtube.com") || host === "youtu.be") return { label: "YouTube", host, dot: "#FF0000" };
     if (host === "maps.app.goo.gl" || host === "goo.gl" || (host.startsWith("google.") && path.startsWith("/maps")) || host === "maps.google.com")
       return { label: "Google Maps", host, dot: "#34A853" };
@@ -106,6 +107,13 @@ export function sourceInfo(url: string): SourceInfo | null {
   } catch {
     return null;
   }
+}
+
+/** Short word for "saved from ___": Instagram, TikTok, YouTube, Maps, or just "web". */
+export function sourceWord(url: string): string {
+  const s = sourceInfo(url);
+  if (!s) return "";
+  return ["Instagram", "TikTok", "YouTube", "Google Maps", "BookMyShow", "IMDb"].includes(s.label) ? (s.label === "Google Maps" ? "Maps" : s.label) : "web";
 }
 
 /** Free "open in maps" link from a place name — no API key involved. */

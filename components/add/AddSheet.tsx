@@ -10,6 +10,7 @@ import type { CategoryId, SavedItem } from "@/lib/types";
 import { looksLikeUrl, normalizeUrl, parseTags } from "@/lib/utils";
 import { useAppUI } from "@/components/ui/AppUI";
 import { deletePhoto, isStoredRef, uploadPhoto, useMediaUrl } from "@/lib/media";
+import { fetchPreview } from "@/lib/capture";
 import { useSession } from "@/lib/session";
 
 interface Props {
@@ -32,10 +33,12 @@ const inputCls = "h-14 w-full rounded-[20px] bg-card px-4 text-ink shadow-soft p
 
 function AddForm({ onClose, category, edit }: Omit<Props, "open">) {
   const { toast } = useAppUI();
+  // an unsent draft survives a dropped connection, an accidental swipe-down, or a tab reload (this session only)
+  const [draft] = useState(() => (edit ? {} : readDraft()));
   const [cat, setCat] = useState<CategoryId>(edit?.category ?? category ?? "places");
-  const [title, setTitle] = useState(edit?.title ?? "");
-  const [url, setUrl] = useState(edit?.source_url ?? "");
-  const [note, setNote] = useState(edit?.description ?? "");
+  const [title, setTitle] = useState(edit?.title ?? draft.title ?? "");
+  const [url, setUrl] = useState(edit?.source_url ?? draft.url ?? "");
+  const [note, setNote] = useState(edit?.description ?? draft.note ?? "");
   const [location, setLocation] = useState(edit?.location_name ?? "");
   const [date, setDate] = useState(edit?.release_date ?? "");
   const [tags, setTags] = useState(edit?.tags.join(", ") ?? "");
@@ -84,6 +87,38 @@ function AddForm({ onClose, category, edit }: Omit<Props, "open">) {
     }
   };
 
+  useEffect(() => {
+    if (edit || saved.current) return;
+    try {
+      if (title || url || note) sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title, url, note }));
+      else sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* private mode: no drafts, no problem */
+    }
+  }, [title, url, note, edit]);
+
+  // pasted a link and left the title empty? peek at the link (safe server-side preview) and offer its title
+  const [peeking, setPeeking] = useState(false);
+  useEffect(() => {
+    if (edit || title || !looksLikeUrl(url)) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      setPeeking(true);
+      const p = await fetchPreview(url);
+      if (!live) return;
+      setPeeking(false);
+      if (p?.title) setTitle((cur) => cur || p.title!);
+      if (p?.location) setLocation((cur) => cur || p.location!);
+      if (p?.image) setImage((cur) => cur || p.image!);
+    }, 700);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+    // only re-run when the link changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
   const canSave = title.trim().length > 0;
 
   const submit = (e: FormEvent) => {
@@ -100,6 +135,11 @@ function AddForm({ onClose, category, edit }: Omit<Props, "open">) {
       image_url: image.trim(),
     };
     saved.current = true;
+    try {
+      sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* ignore */
+    }
     // if they swapped photos in this form, only the final one is kept
     uploaded.current.filter((r) => r !== image).forEach((r) => void deletePhoto(r).catch(() => {}));
     if (edit) {
@@ -150,7 +190,12 @@ function AddForm({ onClose, category, edit }: Omit<Props, "open">) {
             autoComplete="off"
           />
         </label>
-        {url && <SourceChip url={url} className="ml-2" />}
+        {url && (
+          <div className="ml-2 flex items-center gap-2">
+            <SourceChip url={url} saved />
+            {peeking && <span className="text-xs text-mute">checking the link…</span>}
+          </div>
+        )}
 
         <label className="block">
           <span className="sr-only">note</span>
@@ -212,6 +257,15 @@ function AddForm({ onClose, category, edit }: Omit<Props, "open">) {
       </div>
     </form>
   );
+}
+
+const DRAFT_KEY = "our-saturdays:draft";
+function readDraft(): Partial<Record<"title" | "url" | "note", string>> {
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
 }
 
 function titlePlaceholder(c: CategoryId): string {

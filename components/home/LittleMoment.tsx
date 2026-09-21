@@ -34,7 +34,7 @@ export function LittleMoment() {
 
   return (
     <section aria-labelledby="moment-h" className="relative rounded-[32px] bg-card p-5 shadow-soft">
-      <p id="moment-h" className="text-[11px] font-bold uppercase tracking-[0.14em] text-mute">little moment</p>
+      <p id="moment-h" className="text-[11px] font-bold uppercase tracking-[0.14em] text-mute">one little thing</p>
       <div className="mt-3 flex items-center gap-4">
         <CategoryIcon category={item.category} emoji={itemEmoji(item)} size="lg" />
         <p className="font-display text-[19px] font-semibold leading-snug tracking-tight">

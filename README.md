@@ -27,7 +27,7 @@ Never add the `service_role` key to this app.
 ## Supabase setup (free tier)
 
 1. Create a project at supabase.com.
-2. SQL Editor → run **[`supabase/schema.sql`](supabase/schema.sql)**, then **[`supabase/002_photos_and_realtime.sql`](supabase/002_photos_and_realtime.sql)** (in that order; 002 is safe to re-run). 002 adds the private photo bucket, avatar emoji, realtime, and fixes the sharing policies so your partner can edit things you saved.
+2. SQL Editor → run **[`supabase/schema.sql`](supabase/schema.sql)**, then **[`002_photos_and_realtime.sql`](supabase/002_photos_and_realtime.sql)**, then **[`003_interactions.sql`](supabase/003_interactions.sql)** (in that order; 002 and 003 are safe to re-run). 003 adds the ❤️ 👀 📅 reactions; without it the app still works, just without reactions. 002 adds the private photo bucket, avatar emoji, realtime, and fixes the sharing policies so your partner can edit things you saved.
 3. Authentication → Providers → Email: on. For a two-person app, turn **off** "Confirm email" so sign-up is instant (otherwise the confirmation email must be clicked first; the free tier's built-in mailer is rate-limited).
 4. Put the project URL + anon key in `.env.local` (see above) and on your host.
 5. Storage should now show a **private** bucket called `media`. Don't make it public.
@@ -51,7 +51,8 @@ Never add the `service_role` key to this app.
 Requires local `postgres` (and `postgrest` for the second one): `brew install postgresql@16 postgrest`, then `npm run test:db` / `npm run test:remote`.
 
 - `npm run test:db`: schema + migration (run twice) + RLS behaviour with two couples and an outsider. Caught a real bug (partners couldn't edit each other's items).
-- `npm run test:remote`: the app's actual data layer (`lib/remote.ts`) against real Postgres + PostgREST as 3 different users.
+- `npm run test:remote`: the app's actual data layer (`lib/remote.ts`) against real Postgres + PostgREST as 3 different users (17 steps, including reactions).
+- `npm run test:logic`: the shared-interest rules, Saturday candidates, picker weighting, insights (which must stay silent without enough data), the activity feed, and the link-preview safety checks (SSRF guards). No database needed.
 
 **Not covered by automated tests:** Supabase Auth (GoTrue), Storage signed URLs and Realtime against a *real* Supabase project. I drove the full UI (sign-up → create → join → photo upload → partner edit) against a throwaway fake of auth/storage in front of the real Postgres. Do one real run-through on your project before relying on it.
 
@@ -65,7 +66,10 @@ Open the deployed site in **Safari** → Share → **Add to Home Screen**. It la
 - **Login + shared space**: email/password (Supabase Auth), create/join with an invite code, sign out
 - **Shared data**: everything you save syncs between your two phones (optimistic UI, live updates via Realtime, and a refresh whenever you reopen the app)
 - **Photos**: add photos to anything you save; set a profile photo (or pick an emoji). Photos are resized in the browser and stored privately
-- **Home**: next saturday, recently saved, this week, 🎲 surprise us, little-moment mini game (needs both of you in the space)
+- **Shared finds, no maintenance**: one saved item has one creator; ❤️ 👀 📅 reactions (tap again to undo) live in their own table, so nothing is ever copied. *my finds / their finds / our list* fill themselves: it lands in **our list** once you both show interest (saving counts as the creator's interest). Lines like "you both like this ❤️" or "Aarav wants to do this Saturday 👀" are derived from reactions, not stored statuses. "Not for us" (in •••) quietly removes it from our list and the picker.
+- **Home**: greeting, **saturday? 👀** (what you both like or said "saturday?" to, with *lock it*, plus 🎲 pick for us, weighted toward mutual interest and never repeating what it just showed), *from you / from them* with a one-tap ❤️, **lately** (a true sentence about your week, plus observations that only appear when the data supports them), a small activity feed (`/activity`), and the little who-saved-this game
+- **Capture from outside**: Android share menu (installed PWA), an iPhone Shortcut (steps in **us → save from anywhere**), or **paste a link** on Home. It saves instantly ("Saved from Instagram") and fills in a real title/image if a safe preview exists (YouTube, Google Maps place names, normal websites). Instagram/TikTok/Facebook are never fetched, only the link is kept. Re-sharing a link doesn't duplicate it
+- **Resilient**: reactions update instantly; if a save fails the reaction reverts and a "retry" notice appears; offline banner; unsent add-form text survives a reload
 - **Later**: category bar, status filters, search, cards, `•••` menu (done / maybe / archive / edit / delete)
 - **Add sheet**: category → title → done. Links are detected (Instagram / YouTube / Maps / any URL; saved, never scraped)
 - **Item detail**, **Us** (stats, profiles), PWA manifest + icons
@@ -78,6 +82,10 @@ Open the deployed site in **Safari** → Share → **Add to Home Screen**. It la
 | Trips (itinerary, budget) | placeholder screen. Tables + RLS exist |
 | Memories (photo wall) | placeholder screen. The private `media` bucket and RLS are ready for it |
 | Games | "who saved this?" mini card on Home only; full games + history pending |
+| Drawings, memories in the activity feed | those features don't exist yet, so the feed can't mention them (it never invents events) |
+| Calendar sync | not built. Saturday plans are lightweight and optional; nothing forces a second calendar |
+| Offline queue / cached data | you get an offline banner, a retry on failed reactions, and kept form drafts; there's no offline cache or queued writes |
+| Map preview | "open in maps →" only; no embedded map |
 | App lock (PIN / passkey / couple challenge) | pending |
 | Password reset ("forgot password") | not built. Reset from the Supabase dashboard for now |
 | Server-side route protection | not needed for privacy (the shell has no private data; RLS guards the API) but no middleware yet |

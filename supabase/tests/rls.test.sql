@@ -118,5 +118,34 @@ delete from storage.objects;                                                    
 select pg_temp.as_admin();
 select pg_temp.expect_count($$select 1 from storage.objects$$, 1);
 
+
+-- ── 003: item_interactions ───────────────────────────────────────────────────
+select pg_temp.as_admin();
+select id as ramen_id from public.saved_items where title = 'Ramen' \gset
+-- bob reacts to alice's find
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+insert into public.item_interactions (couple_id, saved_item_id, interaction_type) values (:'a_couple', :'ramen_id', 'like');
+select pg_temp.expect_error(format($$insert into public.item_interactions (couple_id, saved_item_id, interaction_type) values (%L, %L, 'like')$$, :'a_couple', :'ramen_id'), 'duplicate key');   -- toggle, not stack
+select pg_temp.expect_error(format($$insert into public.item_interactions (couple_id, saved_item_id, user_id, interaction_type) values (%L, %L, '00000000-0000-0000-0000-00000000000a', 'like')$$, :'a_couple', :'ramen_id'), 'row-level security');  -- can't react as her
+select pg_temp.expect_error(format($$insert into public.item_interactions (couple_id, saved_item_id, interaction_type) values (%L, %L, 'love')$$, :'a_couple', :'ramen_id'), 'check constraint');
+-- alice sees bob's reaction, can't delete it, and can add her own
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_count($$select 1 from public.item_interactions$$, 1);
+delete from public.item_interactions;   -- not hers → 0 rows
+select pg_temp.expect_count($$select 1 from public.item_interactions$$, 1);
+insert into public.item_interactions (couple_id, saved_item_id, interaction_type) values (:'a_couple', :'ramen_id', 'saturday');
+-- carol (outsider) sees nothing and can't react to alice's item, even claiming her own couple id
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_count($$select 1 from public.item_interactions$$, 0);
+select pg_temp.expect_error(format($$insert into public.item_interactions (couple_id, saved_item_id, interaction_type) values (%L, %L, 'like')$$, :'a_couple', :'ramen_id'), 'row-level security');
+select pg_temp.expect_error(format($$insert into public.item_interactions (couple_id, saved_item_id, interaction_type) select id, %L, 'like' from public.couples$$, :'ramen_id'), 'row-level security');  -- her own couple id + alice's item
+-- bob can undo his own
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+delete from public.item_interactions where interaction_type = 'like';
+select pg_temp.expect_count($$select 1 from public.item_interactions where interaction_type = 'like'$$, 0);
+select pg_temp.expect_count($$select 1 from public.item_interactions$$, 1);
+select pg_temp.as_admin();
+select pg_temp.expect_count($$select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'item_interactions'$$, 1);
+
 -- 002 is idempotent (re-run safe) — checked by the runner script.
 select 'ALL RLS TESTS PASSED' as result;

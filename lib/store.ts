@@ -12,7 +12,7 @@ import { deletePhoto, isStoredRef } from "./media";
 import * as remoteIO from "./remote";
 import { buildSeed, DEFAULT_PROFILES } from "./seed";
 import { getSupabase, isSupabaseConfigured as shared } from "./supabase/client";
-import type { NewItemInput, Plan, Profile, SavedItem, Status } from "./types";
+import type { Interaction, InteractionType, NewItemInput, Plan, Profile, SavedItem, Status } from "./types";
 import { nextSaturday, toISODate } from "./utils";
 
 const KEY = "our-saturdays:v1";
@@ -24,9 +24,14 @@ export interface StoreState {
   plans: Plan[];
   profiles: Profile[];
   meId: string;
+  interactions: Interaction[];
+  /** false when the database doesn't have item_interactions yet (migration 003 not run) */
+  interactionsReady: boolean;
+  /** a small, non-blocking message (e.g. "couldn't save that — retry") */
+  notice: { id: number; message: string; retry?: () => void } | null;
 }
 
-const LOADING: StoreState = { ready: false, error: null, items: [], plans: [], profiles: shared ? [] : DEFAULT_PROFILES, meId: "u1" };
+const LOADING: StoreState = { ready: false, error: null, items: [], plans: [], profiles: shared ? [] : DEFAULT_PROFILES, meId: "u1", interactions: [], interactionsReady: true, notice: null };
 
 let state: StoreState | null = null;
 const listeners = new Set<() => void>();
@@ -35,8 +40,8 @@ const notify = () => listeners.forEach((l) => l());
 // ---- demo (local) persistence ----------------------------------------------
 
 function seeded(error: string | null = null): StoreState {
-  const { items, plans } = buildSeed();
-  return { ready: true, error, items, plans, profiles: DEFAULT_PROFILES, meId: "u1" };
+  const { items, plans, interactions } = buildSeed();
+  return { ready: true, error, items, plans, profiles: DEFAULT_PROFILES, meId: "u1", interactions, interactionsReady: true, notice: null };
 }
 
 function loadLocal(): StoreState {
@@ -46,7 +51,7 @@ function loadLocal(): StoreState {
     const parsed = JSON.parse(raw) as Partial<StoreState>;
     if (!Array.isArray(parsed.items) || !Array.isArray(parsed.plans)) throw new Error("bad shape");
     const profiles = parsed.profiles?.length === 2 ? parsed.profiles.map((p, i) => ({ ...DEFAULT_PROFILES[i], ...p })) : DEFAULT_PROFILES;
-    return { ready: true, error: null, items: parsed.items, plans: parsed.plans, profiles, meId: parsed.meId ?? "u1" };
+    return { ready: true, error: null, items: parsed.items, plans: parsed.plans, profiles, meId: parsed.meId ?? "u1", interactions: parsed.interactions ?? buildSeed().interactions, interactionsReady: true, notice: null };
   } catch {
     // corrupted or blocked storage: fall back to demo data instead of a blank app
     return seeded("we couldn't read your saved stuff, so here's the demo set");
@@ -57,8 +62,8 @@ function commit(next: StoreState) {
   state = next;
   if (!shared) {
     try {
-      const { items, plans, profiles, meId } = next;
-      localStorage.setItem(KEY, JSON.stringify({ items, plans, profiles, meId }));
+      const { items, plans, profiles, meId, interactions } = next;
+      localStorage.setItem(KEY, JSON.stringify({ items, plans, profiles, meId, interactions }));
     } catch {
       // storage full/blocked — keep working in memory
     }
@@ -101,6 +106,12 @@ export function useItem(id: string): { item: SavedItem | undefined; ready: boole
   return { item: s.items.find((i) => i.id === id), ready: s.ready };
 }
 
+/** " (reason)" when the error has one worth showing; empty otherwise (no dangling parentheses). */
+const detail = (e: unknown) => {
+  const m = e instanceof Error ? e.message.trim() : "";
+  return m ? ` (${m})` : "";
+};
+
 // ---- shared mode: boot, sync, teardown -------------------------------------
 
 let ctx: { userId: string; coupleId: string } | null = null;
@@ -124,10 +135,10 @@ async function refresh() {
     if (ctx !== mine || pending > 0) return; // signed out, or a write started meanwhile
     // you first, then your person
     const profiles = [...data.profiles].sort((a, b) => Number(b.id === mine.userId) - Number(a.id === mine.userId));
-    commit({ ready: true, error: null, ...data, profiles, meId: mine.userId });
+    commit({ ...getSnapshot(), ready: true, error: null, ...data, profiles, meId: mine.userId });
   } catch (e) {
     if (ctx !== mine) return;
-    commit({ ...getSnapshot(), ready: true, error: `couldn't reach our space (${(e as Error).message}). we'll keep trying.` });
+    commit({ ...getSnapshot(), ready: true, error: `couldn't reach our space${detail(e)} — we'll keep trying.` });
     scheduleRefresh(8000);
   }
 }
@@ -146,6 +157,7 @@ export async function bootRemote(userId: string, coupleId: string) {
     .channel(`space:${coupleId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "saved_items" }, (p) => relevant(p) && scheduleRefresh())
     .on("postgres_changes", { event: "*", schema: "public", table: "plans" }, (p) => relevant(p) && scheduleRefresh())
+    .on("postgres_changes", { event: "*", schema: "public", table: "item_interactions" }, (p) => relevant(p) && scheduleRefresh())
     .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => scheduleRefresh())
     .subscribe();
   // phones suspend websockets in the background; catching up on return is what makes it feel live
@@ -171,7 +183,7 @@ async function send(job: (sb: ReturnType<typeof getSupabase>) => Promise<void>) 
   try {
     await job(getSupabase());
   } catch (e) {
-    commit({ ...getSnapshot(), error: `that didn't save (${(e as Error).message})` });
+    commit({ ...getSnapshot(), error: `that didn't save${detail(e)}` });
   } finally {
     pending--;
     scheduleRefresh(pending ? 400 : 0);
@@ -227,7 +239,7 @@ export function removeItem(id: string) {
   if (!usable()) return;
   const s = getSnapshot();
   const old = s.items.find((i) => i.id === id);
-  commit({ ...s, items: s.items.filter((i) => i.id !== id), plans: s.plans.filter((p) => p.saved_item_id !== id) });
+  commit({ ...s, items: s.items.filter((i) => i.id !== id), plans: s.plans.filter((p) => p.saved_item_id !== id), interactions: s.interactions.filter((i) => i.saved_item_id !== id) });
   if (ctx) {
     void send(async (sb) => {
       await remoteIO.deleteItem(sb, id);
@@ -270,6 +282,69 @@ export function setStatus(itemId: string, status: Status, date = toISODate(nextS
     items: s.items.map((i) => (i.id === itemId ? { ...i, status, updated_at: now } : i)),
   });
   if (ctx) void send((sb) => remoteIO.setItemStatusOffCalendar(sb, itemId, status));
+}
+
+/** Read-only lookups for code that runs outside React (e.g. link capture). */
+export function getItemNow(id: string): SavedItem | undefined {
+  return getSnapshot().items.find((i) => i.id === id);
+}
+
+const normUrl = (u: string) => u.trim().replace(/#.*$/, "").replace(/[?&](utm_[a-z]+|igsh|igshid|si|fbclid)=[^&]*/gi, "").replace(/[?&]$/, "").replace(/\/+$/, "").toLowerCase();
+/** Same link saved twice (ignoring tracking junk) → the existing item, so re-sharing never duplicates. */
+export function findItemByUrl(url: string): SavedItem | undefined {
+  const n = normUrl(url);
+  return getSnapshot().items.find((i) => i.source_url && normUrl(i.source_url) === n);
+}
+
+// ---- reactions ---------------------------------------------------------------
+
+let noticeSeq = 0;
+/** Show a small, non-blocking message. Pass `retry` to offer a "try again". */
+export function showNotice(message: string, retry?: () => void) {
+  commit({ ...getSnapshot(), notice: { id: ++noticeSeq, message, retry } });
+}
+export function dismissNotice() {
+  const s = getSnapshot();
+  if (s.notice) commit({ ...s, notice: null });
+}
+
+const POSITIVE_TYPES: InteractionType[] = ["like", "interested", "saturday"];
+
+/**
+ * Tap a reaction on/off. The UI updates instantly; the write follows. If it fails, this one reaction is put
+ * back exactly as it was and a small "try again" appears — nothing else on screen is disturbed.
+ */
+export function toggleInteraction(itemId: string, type: InteractionType) {
+  if (!usable()) return;
+  const s = getSnapshot();
+  if (shared && !s.interactionsReady) return showNotice("reactions need the latest database update (run 003_interactions.sql)");
+  const mine = (i: Interaction) => i.saved_item_id === itemId && i.user_id === s.meId;
+  const before = s.interactions.filter(mine);
+  const existing = before.find((i) => i.type === type);
+  const created: Interaction | null = existing ? null : { id: uid(), saved_item_id: itemId, user_id: s.meId, type, created_at: new Date().toISOString() };
+  // "not for us" and any positive reaction cancel each other (for the same person)
+  const removed = existing ? [existing] : before.filter((i) => (type === "dismissed" ? POSITIVE_TYPES.includes(i.type) : POSITIVE_TYPES.includes(type) && i.type === "dismissed"));
+  const rest = s.interactions.filter((i) => !removed.includes(i));
+  commit({ ...s, interactions: created ? [...rest, created] : rest });
+  if (!ctx) return;
+  const coupleId = ctx.coupleId;
+  pending++;
+  void (async () => {
+    try {
+      const sb = getSupabase();
+      for (const r of removed) await remoteIO.deleteInteraction(sb, itemId, s.meId, r.type);
+      if (created) await remoteIO.insertInteraction(sb, coupleId, created);
+    } catch (e) {
+      // revert just this item's reactions for me, then offer a retry
+      const now = getSnapshot();
+      commit({ ...now, interactions: [...now.interactions.filter((i) => !mine(i)), ...before] });
+      console.warn("reaction failed", e);
+      showNotice("couldn't save that — check your connection", () => toggleInteraction(itemId, type));
+    } finally {
+      pending--;
+      scheduleRefresh(pending ? 400 : 0);
+    }
+  })();
 }
 
 /** Demo mode only: pretend to be the other person. In shared mode you are whoever signed in. */

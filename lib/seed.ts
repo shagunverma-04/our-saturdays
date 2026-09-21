@@ -1,4 +1,4 @@
-import type { CategoryId, Plan, Profile, SavedItem, Status } from "./types";
+import type { CategoryId, Interaction, InteractionType, Plan, Profile, SavedItem, Status } from "./types";
 import { toISODate } from "./utils";
 
 export const DEFAULT_PROFILES: Profile[] = [
@@ -44,7 +44,20 @@ const SEEDS: Seed[] = [
   { key: "coorg", title: "Coorg weekend", category: "travel", description: "rain, coffee estates, board games", location_name: "Coorg", by: "u2", ago: 120, status: "done", tags: ["trek"] },
 ];
 
-export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[] } {
+// [item key, who reacted, what, days ago]
+const REACTIONS: Array<[string, "u1" | "u2", InteractionType, number]> = [
+  ["clay", "u2", "like", 5],
+  ["ramen", "u1", "like", 20],
+  ["ramen", "u1", "saturday", 1],
+  ["ramen", "u2", "saturday", 1],
+  ["roastery", "u2", "interested", 1],
+  ["kayak", "u1", "like", 3],
+  ["goa", "u1", "like", 12],
+  ["concert", "u2", "saturday", 1],
+  ["salsa", "u1", "interested", 2],
+];
+
+export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]; interactions: Interaction[] } {
   const items: SavedItem[] = SEEDS.map((s) => {
     const created = new Date(now.getTime() - s.ago * DAY).toISOString();
     return {
@@ -64,5 +77,12 @@ export function buildSeed(now = new Date()): { items: SavedItem[]; plans: Plan[]
       updated_at: created,
     };
   });
-  return { items, plans: [] };
+  const interactions: Interaction[] = REACTIONS.map(([key, by, type, ago], n) => ({
+    id: `seed-int-${n}`,
+    saved_item_id: `seed-${key}`,
+    user_id: by,
+    type,
+    created_at: new Date(now.getTime() - ago * DAY).toISOString(),
+  }));
+  return { items, plans: [], interactions };
 }

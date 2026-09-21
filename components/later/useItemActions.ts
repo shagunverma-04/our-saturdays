@@ -1,29 +1,27 @@
 "use client";
 
 import { useAppUI } from "@/components/ui/AppUI";
-import { removeItem, setStatus } from "@/lib/store";
+import { removeItem, setStatus, toggleInteraction } from "@/lib/store";
 import type { SavedItem, Status } from "@/lib/types";
-import { nextSaturday, toISODate } from "@/lib/utils";
 
-/** Shared actions for cards, menus and the detail page. Each one gives a little feedback. */
+/** The few things that aren't a one-tap reaction: finishing, passing, editing, removing. */
 export function useItemActions() {
   const { toast, openAdd } = useAppUI();
 
   return {
-    letsGo(item: SavedItem) {
-      setStatus(item.id, "planned", toISODate(nextSaturday()));
-      toast("it's a date — saturday", "🗓️");
-    },
     changeStatus(item: SavedItem, status: Status) {
       setStatus(item.id, status);
-      const msg: Record<Status, [string, string]> = {
-        saved: ["back on the list", "📌"],
-        planned: ["it's a date — saturday", "🗓️"],
+      const msg: Partial<Record<Status, [string, string]>> = {
         done: ["we did it!", "🎉"],
-        maybe: ["maybe someday", "🤔"],
+        saved: ["back on the list", "📌"],
         archived: ["tucked away", "📦"],
       };
-      toast(msg[status][0], msg[status][1]);
+      const m = msg[status];
+      if (m) toast(m[0], m[1]);
+    },
+    /** "not for us": quietly drops it from our list and the picker. Tap again to bring it back. */
+    togglePass(item: SavedItem) {
+      toggleInteraction(item.id, "dismissed");
     },
     edit(item: SavedItem) {
       openAdd({ edit: item, category: item.category });

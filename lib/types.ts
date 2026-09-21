@@ -40,3 +40,14 @@ export interface Plan {
 
 export type NewItemInput = Pick<SavedItem, "title" | "category"> &
   Partial<Omit<SavedItem, "id" | "created_by" | "created_at" | "updated_at" | "title" | "category">>;
+
+export type InteractionType = "like" | "interested" | "saturday" | "done" | "dismissed";
+
+/** One person's lightweight reaction to a shared find. The creator's own interest is implicit (no row). */
+export interface Interaction {
+  id: string;
+  saved_item_id: string;
+  user_id: string;
+  type: InteractionType;
+  created_at: string;
+}

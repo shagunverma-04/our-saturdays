@@ -2,7 +2,7 @@
 // so the store stays simple and these exact queries are integration-tested (supabase/tests/remote.test.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Plan, Profile, SavedItem } from "./types";
+import type { Interaction, InteractionType, Plan, Profile, SavedItem } from "./types";
 
 type Row = Record<string, unknown>;
 interface Result {
@@ -60,6 +60,10 @@ export function rowToProfile(r: Row): Profile {
   return { id: r.id as string, name: (r.name as string) ?? "", avatar: (r.avatar_emoji as string) ?? "🙂", photo: (r.avatar_url as string | null) ?? "" };
 }
 
+export function rowToInteraction(r: Row): Interaction {
+  return { id: r.id as string, saved_item_id: r.saved_item_id as string, user_id: r.user_id as string, type: r.interaction_type as InteractionType, created_at: r.created_at as string };
+}
+
 export function profilePatchToRow(p: Partial<Profile>): Row {
   const row: Row = {};
   if (p.name !== undefined) row.name = p.name;
@@ -70,17 +74,21 @@ export function profilePatchToRow(p: Partial<Profile>): Row {
 
 // ---- reads -----------------------------------------------------------------
 
-export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem[]; plans: Plan[]; profiles: Profile[] }> {
+export async function fetchSpace(sb: SupabaseClient): Promise<{ items: SavedItem[]; plans: Plan[]; profiles: Profile[]; interactions: Interaction[]; interactionsReady: boolean }> {
   // RLS scopes every one of these to the caller's couple, so no couple_id filter is needed (or trusted).
-  const [items, plans, profiles] = await Promise.all([
+  const [items, plans, profiles, inter] = await Promise.all([
     ok(sb.from("saved_items").select("*").order("created_at", { ascending: false }).limit(1000)),
     ok(sb.from("plans").select("*")),
     ok(sb.from("profiles").select("id, name, avatar_emoji, avatar_url")),
+    // tolerated separately: if migration 003 hasn't been run yet the app still works, just without reactions
+    sb.from("item_interactions").select("id, saved_item_id, user_id, interaction_type, created_at").limit(5000),
   ]);
   return {
     items: (items.data as Row[]).map(rowToItem),
     plans: (plans.data as Row[]).map(rowToPlan),
     profiles: (profiles.data as Row[]).map(rowToProfile),
+    interactions: inter.error ? [] : ((inter.data ?? []) as Row[]).map(rowToInteraction),
+    interactionsReady: !inter.error,
   };
 }
 
@@ -129,6 +137,16 @@ export async function setItemStatusOffCalendar(sb: SupabaseClient, itemId: strin
 
 export async function patchProfile(sb: SupabaseClient, id: string, patch: Partial<Profile>) {
   await ok(sb.from("profiles").update(profilePatchToRow(patch)).eq("id", id));
+}
+
+// ---- reactions -------------------------------------------------------------
+
+export async function insertInteraction(sb: SupabaseClient, coupleId: string, i: Interaction) {
+  await ok(sb.from("item_interactions").insert({ id: i.id, couple_id: coupleId, saved_item_id: i.saved_item_id, user_id: i.user_id, interaction_type: i.type }));
+}
+
+export async function deleteInteraction(sb: SupabaseClient, itemId: string, userId: string, type: InteractionType) {
+  await ok(sb.from("item_interactions").delete().eq("saved_item_id", itemId).eq("user_id", userId).eq("interaction_type", type));
 }
 
 // ---- couples (RPC — members can't insert into couples directly) ------------

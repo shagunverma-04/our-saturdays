@@ -5,18 +5,21 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { ItemMenu } from "@/components/later/ItemMenu";
+import { ReactionBar } from "@/components/later/ReactionBar";
 import { useItemActions } from "@/components/later/useItemActions";
-import { Avatar, Chip, ErrorState, PillButton, Skeleton, SourceChip } from "@/components/ui/bits";
+import { Avatar, ErrorState, PillButton, Skeleton, SourceChip } from "@/components/ui/bits";
 import { ItemArt } from "@/components/ui/ItemArt";
-import { CATEGORY_BY_ID, STATUSES } from "@/lib/categories";
-import { updateItem, useItem, useStore } from "@/lib/store";
+import { CATEGORY_BY_ID } from "@/lib/categories";
+import { sourceInfo } from "@/lib/utils";
+import { updateItem } from "@/lib/store";
+import { useShared } from "@/lib/useShared";
 import { countdown, friendlyDay, mapsSearchUrl, timeAgo } from "@/lib/utils";
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { item, ready } = useItem(id);
-  const { profiles } = useStore();
+  const { ready, items, profiles, line, foundBy } = useShared();
+  const item = items.find((i) => i.id === id);
   const a = useItemActions();
   const [menu, setMenu] = useState(false);
 
@@ -47,6 +50,9 @@ export default function ItemDetailPage() {
 
   const cat = CATEGORY_BY_ID[item.category];
   const by = profiles.find((p) => p.id === item.created_by) ?? profiles[0];
+  const talk = line(item);
+  // a saved Google Maps link IS the maps link; otherwise search by the place name (no API, no key)
+  const mapsHref = sourceInfo(item.source_url)?.label === "Google Maps" ? item.source_url : item.location_name ? mapsSearchUrl(item.location_name) : "";
 
   return (
     <main className="mx-auto max-w-[640px] space-y-5 pb-4">
@@ -67,21 +73,21 @@ export default function ItemDetailPage() {
         </p>
         <h1 className="mt-1 font-display text-[34px] font-bold leading-[1.05] tracking-tight">{item.title}</h1>
         {item.description && <p className="mt-2 text-[17px] text-ink/70">{item.description}</p>}
+        {talk && <p className="mt-3 text-[17px] font-semibold">{talk}</p>}
       </div>
 
-      <section aria-label="status" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        {STATUSES.map((s) => (
-          <Chip key={s.id} active={item.status === s.id} onClick={() => item.status !== s.id && a.changeStatus(item, s.id)}>
-            {s.label}
-          </Chip>
-        ))}
-      </section>
+      <ReactionBar item={item} />
 
       <section className="divide-y divide-line overflow-hidden rounded-card bg-card shadow-soft">
         {item.location_name && (
           <Row label="where">
-            <a href={mapsSearchUrl(item.location_name)} target="_blank" rel="noopener noreferrer" className="font-medium underline decoration-ink/20 underline-offset-4">
-              📍 {item.location_name} ↗
+            <span className="font-medium">📍 {item.location_name}</span>
+          </Row>
+        )}
+        {mapsHref && (
+          <Row label="maps">
+            <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="font-medium underline decoration-ink/20 underline-offset-4">
+              open in maps →
             </a>
           </Row>
         )}
@@ -95,13 +101,13 @@ export default function ItemDetailPage() {
         {item.source_url && (
           <Row label="from">
             <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 font-medium">
-              <SourceChip url={item.source_url} /> <span className="underline decoration-ink/20 underline-offset-4">view original ↗</span>
+              <SourceChip url={item.source_url} saved /> <span className="underline decoration-ink/20 underline-offset-4">view original ↗</span>
             </a>
           </Row>
         )}
-        <Row label="saved by">
+        <Row label="found by">
           <span className="flex items-center gap-2 font-medium">
-            <Avatar profile={by} size={26} /> {by.name} <span className="font-normal text-mute">· {timeAgo(item.created_at)}</span>
+            <Avatar profile={by} size={26} /> {foundBy(item).replace("found by ", "")} <span className="font-normal text-mute">· {timeAgo(item.created_at)}</span>
           </span>
         </Row>
         {item.tags.length > 0 && (
@@ -120,14 +126,10 @@ export default function ItemDetailPage() {
       <NotesBox key={item.id} id={item.id} saved={item.notes} />
 
       <div className="flex gap-3">
-        {item.status === "done" || item.status === "planned" ? (
-          item.status === "planned" ? (
-            <PillButton size="lg" className="flex-1" onClick={() => a.changeStatus(item, "done")}>we did it 🎉</PillButton>
-          ) : (
-            <PillButton size="lg" tone="ghost" className="flex-1" onClick={() => a.changeStatus(item, "saved")}>do it again?</PillButton>
-          )
+        {item.status === "done" ? (
+          <PillButton size="lg" tone="ghost" className="flex-1" onClick={() => a.changeStatus(item, "saved")}>we haven&apos;t done this</PillButton>
         ) : (
-          <PillButton size="lg" className="flex-1" onClick={() => a.letsGo(item)}>let&apos;s go</PillButton>
+          <PillButton size="lg" className="flex-1" onClick={() => a.changeStatus(item, "done")}>we did it 🎉</PillButton>
         )}
         <PillButton size="lg" tone="ghost" onClick={() => a.edit(item)}>edit</PillButton>
       </div>

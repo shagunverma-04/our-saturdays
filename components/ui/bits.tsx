@@ -2,7 +2,7 @@
 
 import { motion, type HTMLMotionProps } from "framer-motion";
 import { useState, type ReactNode } from "react";
-import { sourceInfo, cn } from "@/lib/utils";
+import { sourceInfo, sourceWord, cn } from "@/lib/utils";
 import { useMediaUrl } from "@/lib/media";
 import type { Profile } from "@/lib/types";
 
@@ -53,13 +53,13 @@ export function Chip({ active, children, onClick, className }: { active?: boolea
   );
 }
 
-export function SourceChip({ url, className }: { url: string; className?: string }) {
+export function SourceChip({ url, className, saved }: { url: string; className?: string; saved?: boolean }) {
   const s = sourceInfo(url);
   if (!s) return null;
   return (
     <span className={cn("inline-flex max-w-full items-center gap-1.5 rounded-full bg-ink/[0.05] px-2.5 py-1 text-xs font-medium text-ink/70", className)}>
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: s.dot }} />
-      <span className="truncate">{s.label}</span>
+      <span className="truncate">{saved ? `saved from ${sourceWord(url)}` : s.label}</span>
     </span>
   );
 }

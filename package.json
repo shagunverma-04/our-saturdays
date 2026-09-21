@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:db": "bash supabase/tests/run.sh",
-    "test:remote": "bash supabase/tests/run-remote.sh"
+    "test:remote": "bash supabase/tests/run-remote.sh",
+    "test:logic": "node --test tests/logic.test.ts tests/preview.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

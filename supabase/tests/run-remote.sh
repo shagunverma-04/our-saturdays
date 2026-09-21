@@ -10,7 +10,7 @@ PGREST_PID=""
 trap '[ -n "$PGREST_PID" ] && kill $PGREST_PID 2>/dev/null; pg_ctl -D "$D/data" -m immediate stop >/dev/null 2>&1; rm -rf "$D"' EXIT
 P=(psql -h 127.0.0.1 -p $PG -U postgres -v ON_ERROR_STOP=1 -q -X)
 "${P[@]}" -c "create database t"; P+=(-d t)
-"${P[@]}" -f tests/stubs.sql 2>/dev/null; "${P[@]}" -f schema.sql; "${P[@]}" -f 002_photos_and_realtime.sql 2>/dev/null
+"${P[@]}" -f tests/stubs.sql 2>/dev/null; "${P[@]}" -f schema.sql; "${P[@]}" -f 002_photos_and_realtime.sql 2>/dev/null; "${P[@]}" -f 003_interactions.sql
 "${P[@]}" -c "insert into auth.users (id, email, raw_user_meta_data) values
  ('00000000-0000-0000-0000-00000000000a','a@x.test','{\"name\":\"Alice\"}'),('00000000-0000-0000-0000-00000000000b','b@x.test','{\"name\":\"Bob\"}'),
  ('00000000-0000-0000-0000-00000000000c','c@x.test','{}'),('00000000-0000-0000-0000-00000000000d','d@x.test','{}')"

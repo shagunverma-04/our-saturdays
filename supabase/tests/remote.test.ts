@@ -101,6 +101,33 @@ await step("an outsider (carol, her own space) sees nothing of ours and can't to
   assert.equal((await r.fetchSpace(alice)).items.find((i) => i.id === ramen.id)!.title, "Ramen Tei");
   await assert.rejects(r.insertItem(carol, coupleId, item({ created_by: ID.carol })), /row-level security/);
 });
+const inter = (itemId: string, user: string, type: import("../../lib/types.ts").InteractionType) => ({ id: crypto.randomUUID(), saved_item_id: itemId, user_id: user, type, created_at: new Date().toISOString() });
+await step("reactions: partner likes alice's find; both see it; a repeat tap is a database-level no-dupe", async () => {
+  await r.insertInteraction(bob, coupleId, inter(ramen.id, ID.bob, "like"));
+  await r.insertInteraction(alice, coupleId, inter(ramen.id, ID.alice, "saturday"));
+  const s = await r.fetchSpace(alice);
+  assert.equal(s.interactionsReady, true);
+  assert.deepEqual(s.interactions.map((i) => `${i.user_id === ID.bob ? "bob" : "alice"}:${i.type}`).sort(), ["alice:saturday", "bob:like"]);
+  assert.deepEqual((await r.fetchSpace(bob)).interactions.length, 2);
+  await assert.rejects(r.insertInteraction(bob, coupleId, inter(ramen.id, ID.bob, "like")), /duplicate key/);
+});
+await step("reactions: you can only un-react as yourself", async () => {
+  await r.deleteInteraction(alice, ramen.id, ID.bob, "like"); // tries to remove bob's like → affects 0 rows
+  assert.equal((await r.fetchSpace(bob)).interactions.some((i) => i.type === "like"), true);
+  await r.deleteInteraction(bob, ramen.id, ID.bob, "like");
+  assert.equal((await r.fetchSpace(bob)).interactions.some((i) => i.type === "like"), false);
+});
+await step("reactions: outsider sees none and can't react to our item", async () => {
+  assert.equal((await r.fetchSpace(carol)).interactions.length, 0);
+  await assert.rejects(r.insertInteraction(carol, coupleId, inter(ramen.id, ID.carol, "like")), /row-level security/);
+});
+await step("reactions: deleting an item takes its reactions with it", async () => {
+  const tmp = item({ title: "temp" });
+  await r.insertItem(alice, coupleId, tmp);
+  await r.insertInteraction(bob, coupleId, inter(tmp.id, ID.bob, "like"));
+  await r.deleteItem(alice, tmp.id);
+  assert.equal((await r.fetchSpace(alice)).interactions.some((i) => i.saved_item_id === tmp.id), false);
+});
 await step("delete removes the item and its plans", async () => {
   await r.writePlan(alice, coupleId, { id: crypto.randomUUID(), title: "Ramen", date, category: "eat", saved_item_id: ramen.id, created_at: "" }, []);
   await r.deleteItem(bob, ramen.id);
